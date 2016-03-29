@@ -15,6 +15,7 @@
 #ifdef NONPRIMITIVE_KEY
 #include <string.h>
 #endif
+#include <cstddef>
 
 template <class KEY, class DATA> class avltreeelement;
 template <class KEY, class DATA> class avltree;
