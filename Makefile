@@ -8,7 +8,7 @@ REL_CPPFLAGS := -g0 -O2 -Wall -fPIC
 
 
 INCLUDES := $(INC-y:%=-I%)
-LIBRARY :=
+LIBRARY := -lpthread -std=c++11 
 
 MKDIR=mkdir
 CXX := g++
