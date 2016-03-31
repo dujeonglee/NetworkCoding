@@ -2,21 +2,20 @@
 #define SINGLESHOTTIMER_H_
 #include <thread>
 #include <mutex>
-
-typedef void (*handler_func)();
+#include <functional>
 
 class singleshottimer{
 private:
     std::timed_mutex _lock;
     unsigned int _timeout;
-    handler_func _cancel_handler;
-    handler_func _timeout_handler;
+    std::function <void (void)> _cancel_handler;
+    std::function <void (void)> _timeout_handler;
     std::thread _thread;
 
 public:
     explicit singleshottimer(){};
     ~singleshottimer(){};
-    void start(unsigned int timeout_milles, handler_func cancel_handler, handler_func timeout_handler){
+    void start(unsigned int timeout_milles, std::function <void (void)>  cancel_handler, std::function <void (void)>  timeout_handler){
         _timeout = timeout_milles;
         _cancel_handler = cancel_handler;
         _timeout_handler = timeout_handler;

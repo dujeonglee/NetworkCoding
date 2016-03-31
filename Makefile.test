@@ -4,23 +4,23 @@
 SOURCES  := $(wildcard *.cpp)
 INCLUDES := 
 OBJECTS  := $(SOURCES:.cpp=.o)
-LIBRARY :=
+LIBRARY := -lpthread
 CPP := g++
 TARGET = test
 
 all : DEBUG
 
 $(TARGET) : $(OBJECTS)
-	$(CPP) -o $@  $^
+	$(CPP) -o $@  $^ 
 
-.cc.o : $(SOURCES)
-	$(CPP) $(CPPFLAGS) $(INCLUDES) $(SOURCES) $(LIBRARY)
+.cpp.o : $(SOURCES)
+	$(CPP) $(SOURCES) $(CPPFLAGS) $(INCLUDES) $(LIBRARY)
 
 clean :
 	rm -rf $(OBJECTS) $(TARGET) *~
 
-DEBUG : CPPFLAGS := -fopenmp -g -c -Wall -Werror
+DEBUG : CPPFLAGS := -g -c -Wall -Werror -std=c++0x -fopenmp 
 DEBUG : $(TARGET)
 
-RELEASE : CPPFLAGS := -fopenmp -O0 -c -Wall -Werror
+RELEASE : CPPFLAGS := -O0 -c -Wall -Werror -std=c++0x -fopenmp 
 RELEASE : $(TARGET)
