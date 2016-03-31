@@ -86,6 +86,9 @@ bool ncserver::open_server(){
     return true;
 }
 
+/*
+ * TODO: Check if this function can be further optimized using rvalue reference using std::move()
+ */
 unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_size){
 	std::lock_guard<std::mutex> lock(_lock);
 	unsigned short int ret = 0;
