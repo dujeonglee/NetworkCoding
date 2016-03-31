@@ -30,8 +30,7 @@ public:
     ~ncserver();
 
 private:
-    sockaddr_in build_addr(unsigned int ip, unsigned short int port);
-    static void _flush_pkts(void* arg);
+    sockaddr_in _build_addr(unsigned int ip, unsigned short int port);
 public:
     bool open_server();
     unsigned short int send(unsigned char* pkt, unsigned short int pkt_size);
