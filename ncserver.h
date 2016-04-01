@@ -16,6 +16,7 @@ private:
 	std::function <void (void)> _cancel_callback;
 	std::function <void (void)> _timeout_callback;
     unsigned char _tx_cnt;
+    unsigned short int _largest_pkt_size;
     unsigned short int _blk_seq;
     unsigned int _pkt_seq;
     unsigned char _redundant_pkts;
