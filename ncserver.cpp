@@ -9,13 +9,14 @@ ncserver::ncserver(unsigned int client_ip, unsigned short int port, unsigned cha
                                     _MAX_BLOCK_SIZE(max_block_size), _TX_TIMEOUT(timeout){
     _socket = 0;
     _tx_cnt = 0;
+    _largest_pkt_size = 0;
     _blk_seq = 0;
     _pkt_seq = 0;
     _redundant_pkts = 2;
 
 	/*
-	 * TODO: 1) Encode meaningful pkts in _buffer. (_buffer may not be full when _flush_pkts is triggered by timeout)
-	 *       2) The length of remedy packet should be as most that of the longest pkt in _buffer.
+	 * TODO: 1) Encode meaningful pkts in _buffer. (_buffer may not be full when _flush_pkts is triggered by timeout) => resolved: for(unsigned int pkt = 0 ; pkt < _tx_cnt ; pkt++){
+	 *       2) The length of remedy packet should be as most that of the longest pkt in _buffer. => resolved: HEADER_SIZE(_MAX_BLOCK_SIZE)+_largest_pkt_size
 	 *       3) Parallelize the encoding process using OpenMP.
 	 * NOTE: 1) This function should be called by singleshottimer. Otherwise, its operation is undefied.
 	 */
@@ -30,8 +31,8 @@ ncserver::ncserver(unsigned int client_ip, unsigned short int port, unsigned cha
 			GET_BLK_SEQ(_remedy_pkt) = _blk_seq;
 			GET_PKT_SEQ(_remedy_pkt) = _pkt_seq++;
 			GET_BLK_SIZE(_remedy_pkt) = _MAX_BLOCK_SIZE;
-			for(unsigned int position = OUTERHEADER_SIZE ; position < HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE) ; position++){
-				for(unsigned int pkt = 0 ; pkt < _MAX_BLOCK_SIZE ; pkt++){
+			for(unsigned int position = OUTERHEADER_SIZE ; position < HEADER_SIZE(_MAX_BLOCK_SIZE)+_largest_pkt_size ; position++){
+				for(unsigned int pkt = 0 ; pkt < _tx_cnt ; pkt++){
 					(pkt == 0?
 						_remedy_pkt[pos] = FiniteField::instance()->mul(_buffer[pkt][position], _rand_coef[pkt]):
 						_remedy_pkt[pos] ^= FiniteField::instance()->mul(_buffer[pkt][position], _rand_coef[pkt]));
@@ -44,6 +45,7 @@ ncserver::ncserver(unsigned int client_ip, unsigned short int port, unsigned cha
 		}
 		_blk_seq++;
 		_tx_cnt = 0;
+		_largest_pkt_size = 0;
 	};
 }
 
@@ -94,6 +96,9 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
 	unsigned short int ret = 0;
 	if(pkt_size > MAX_PAYLOAD_SIZE){
 		return 0; // I will support pkt_size larger than MAX_PAYLOAD_SIZE in the next phase.
+	}
+	if(_largest_pkt_size < pkt_size){
+		_largest_pkt_size = pkt_size;
 	}
 
 	GET_BLK_SEQ(_buffer[_tx_cnt]) = _blk_seq;
