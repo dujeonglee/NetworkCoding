@@ -10,7 +10,7 @@ TARGET = test
 
 all : DEBUG
 
-$(TARGET) : $(OBJECTS)
+$(TARGET) : $(OBJECTS)  $(LIBRARY)
 	$(CPP) -o $@  $^ 
 
 .cpp.o : $(SOURCES)
@@ -19,8 +19,8 @@ $(TARGET) : $(OBJECTS)
 clean :
 	rm -rf $(OBJECTS) $(TARGET) *~
 
-DEBUG : CPPFLAGS := -g -c -Wall -Werror -std=c++0x -fopenmp 
+DEBUG : CPPFLAGS := -g -c -Wall -Werror -std=c++11 -fopenmp
 DEBUG : $(TARGET)
 
-RELEASE : CPPFLAGS := -O0 -c -Wall -Werror -std=c++0x -fopenmp 
+RELEASE : CPPFLAGS := -O0 -c -Wall -Werror -std=c++11 -fopenmp
 RELEASE : $(TARGET)
