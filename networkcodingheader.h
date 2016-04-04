@@ -1,9 +1,10 @@
 #ifndef NETWORKCODINGHEADER_H_
 #define NETWORKCODINGHEADER_H_
 
+#include <stddef.h>
+
 #define OUTERHEADER_SIZE						(sizeof(OuterHeader))
 #define GET_BLK_SEQ(pkt)						(*(unsigned short int*)		((unsigned char*)pkt + offsetof(OuterHeader, blk_seq)))
-#define GET_PKT_SEQ(pkt)						(*(unsigned int*)			((unsigned char*)pkt + offsetof(OuterHeader, pkt_seq)))
 #define GET_BLK_SIZE(pkt)						(*(unsigned char*)			((unsigned char*)pkt + offsetof(OuterHeader, blk_size)))
 #define GET_SIZE(pkt)							(*(unsigned short int*)		((unsigned char*)pkt + sizeof(OuterHeader) + offsetof(InnerHeader, size)))
 #define GET_LAST_INDICATOR(pkt)					(*(unsigned char*)          ((unsigned char*)pkt + sizeof(OuterHeader) + offsetof(InnerHeader, last_indicator)))
@@ -15,7 +16,6 @@
 struct OuterHeader
 {
     unsigned short int blk_seq;		/*2*/
-    unsigned int pkt_seq;			/*4*/
     unsigned char blk_size;			/*1*/
 }__attribute__((packed));
 

@@ -11,26 +11,37 @@ private:
     std::function <void (void)> _cancel_handler;
     std::function <void (void)> _timeout_handler;
     std::thread _thread;
+    bool _is_running;
 
 public:
-    explicit singleshottimer(){};
-    ~singleshottimer(){};
-    void start(unsigned int timeout_milles, std::function <void (void)>  cancel_handler, std::function <void (void)>  timeout_handler){
+    singleshottimer(){
+
+    };
+
+    ~singleshottimer(){
+        while(_is_running);
+    };
+
+    void start(unsigned int timeout_milles, std::function <void (void)> cancel_handler, std::function <void (void)> timeout_handler){
         _timeout = timeout_milles;
         _cancel_handler = cancel_handler;
         _timeout_handler = timeout_handler;
         _thread = std::thread([&](){
+            _is_running = true;
             this->_lock.lock();
             if(this->_lock.try_lock_for(std::chrono::milliseconds(this->_timeout)) == true){
-                if(this->_cancel_handler != nullptr)
+                if(this->_cancel_handler != nullptr){
                     this->_cancel_handler();
+                }
             }else{
                 this->_lock.unlock();
-                if(this->_timeout_handler != nullptr)
+                if(this->_timeout_handler != nullptr){
                     this->_timeout_handler();
+                }
             }
-            return;
+            _is_running = false;
         });
+        _thread.detach();
     }
 
     void cancel(){
@@ -38,28 +49,4 @@ public:
     }
 };
 
-#endif
-
-#if 0
-//Example
-#include "singleshottimer.h"
-#include <iostream>
-
-void cancel(){
-    std::cout << "cancel\n";
-}
-
-void timeout(){
-    std::cout << "timeout\n";
-}
-
-int main(){
-    singleshottimer timer;
-    std::cout<<"Timeout for: " << 1000 << std::endl;
-    timer.start(1000, cancel, timeout);
-    std::cout<<"Sleep: " << 100 << std::endl;
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    timer.cancel();
-    while(1);
-}
 #endif
