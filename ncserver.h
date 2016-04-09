@@ -9,13 +9,16 @@
 class ncserver
 {
 private:
+    enum STATE{
+        CLOSE = 0,
+        OPEN
+    };
     const sockaddr_in _CTRL_ADDR;
     const sockaddr_in _DATA_ADDR;
     const unsigned char _MAX_BLOCK_SIZE;
     const unsigned int _TX_TIMEOUT;
-    const std::function <void (void)> _CANCEL_CALLBACK;
-    const std::function <void (void)> _TIMEOUT_CALLBACK;
 
+    STATE _state;
     int _socket;
     unsigned char** _buffer;
 	unsigned char* _rand_coef;
@@ -23,10 +26,7 @@ private:
     unsigned char _tx_cnt;
     unsigned short int _largest_pkt_size;
     unsigned short int _blk_seq;
-    unsigned char _redundant_pkts;
     singleshottimer* _timer;
-    bool _is_opned;
-
     std::mutex _lock;
 
 public:
@@ -34,13 +34,22 @@ public:
     ~ncserver();
 
 private:
-    sockaddr_in _build_addr(unsigned int ip, unsigned short int port);
-    std::function <void (void)> _buid_timer_callback();
+    inline sockaddr_in _build_addr(unsigned int ip, unsigned short int port)
+    {
+        sockaddr_in ret = {0};
+        ret.sin_family = AF_INET;
+        ret.sin_addr.s_addr = htonl(ip);
+        ret.sin_port = htons(port);
+        return ret;
+    }
+
+    bool _send_remedy_pkt();
+    void _retransmission_handler();
+
 public:
-    bool open_server();
     unsigned short int send(unsigned char* pkt, unsigned short int pkt_size);
+    bool open_server();
     void close_server();
 };
-
 
 #endif

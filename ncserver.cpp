@@ -7,11 +7,12 @@
 #include <stdio.h>
 
 ncserver::ncserver(unsigned int client_ip, unsigned short int port, unsigned char max_block_size, unsigned int timeout):\
-    _CTRL_ADDR(_build_addr(INADDR_ANY, port)), _DATA_ADDR(_build_addr(client_ip, port)), \
-    _MAX_BLOCK_SIZE(max_block_size), _TX_TIMEOUT(timeout),\
-    _CANCEL_CALLBACK(_buid_timer_callback()), _TIMEOUT_CALLBACK(_buid_timer_callback())
+    _CTRL_ADDR(_build_addr(INADDR_ANY, port)),\
+    _DATA_ADDR(_build_addr(client_ip, port)), \
+    _MAX_BLOCK_SIZE(max_block_size),\
+    _TX_TIMEOUT(timeout)
 {
-    _is_opned = false;
+    _state = CLOSE;
 }
 
 ncserver::~ncserver()
@@ -19,44 +20,120 @@ ncserver::~ncserver()
     close_server();
 }
 
-sockaddr_in ncserver::_build_addr(unsigned int ip, unsigned short int port)
+unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_size)
 {
-    sockaddr_in ret = {0};
-    ret.sin_family = AF_INET;
-    ret.sin_addr.s_addr = htonl(ip);
-    ret.sin_port = htons(port);
+    unsigned short int ret = 0;
+    if(_lock.try_lock() == false)
+    {
+        return 0;
+    }
+    if(pkt_size > MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE))
+    {
+        // I will support pkt_size larger than MAX_PAYLOAD_SIZE in the next phase.
+        _lock.unlock();
+        return 0;
+    }
+    if(_state == CLOSE)
+    {
+        _lock.unlock();
+        return 0;
+    }
+    if(_largest_pkt_size < pkt_size)
+    {
+        _largest_pkt_size = pkt_size;
+    }
+
+    GET_BLK_SEQ(_buffer[_tx_cnt]) = _blk_seq;
+    GET_BLK_SIZE(_buffer[_tx_cnt]) = _MAX_BLOCK_SIZE;
+    GET_FLAGS(_buffer[_tx_cnt]) = FLAGS_HAS_DATA;
+    if(_tx_cnt == _MAX_BLOCK_SIZE-1)
+    {
+        GET_FLAGS(_buffer[_tx_cnt]) |= FLAGS_END_OF_BLK;
+    }
+    GET_SIZE(_buffer[_tx_cnt]) = pkt_size;
+    GET_LAST_INDICATOR(_buffer[_tx_cnt]) = 1; // I will support pkt_size larger than MAX_PAYLOAD_SIZE in the next phase.
+    memset(GET_CODE(_buffer[_tx_cnt]), 0x0, _MAX_BLOCK_SIZE);
+    GET_CODE(_buffer[_tx_cnt])[_tx_cnt] = 1;
+    memcpy(GET_PAYLOAD(_buffer[_tx_cnt], _MAX_BLOCK_SIZE), pkt, pkt_size);
+
+    if(sendto(_socket, _buffer[_tx_cnt], pkt_size + HEADER_SIZE(_MAX_BLOCK_SIZE), 0, (sockaddr*)&_DATA_ADDR, sizeof(_DATA_ADDR)) == (int)(pkt_size + HEADER_SIZE(_MAX_BLOCK_SIZE)))
+    {
+        ret = pkt_size;
+    }
+    else
+    {
+        ret = 0;
+    }
+    if(_tx_cnt == 0)
+    {
+        _timer->start(_TX_TIMEOUT, [](){this->_retransmission_handler();}, [](){this->_retransmission_handler();});
+    }
+    if(_tx_cnt == _MAX_BLOCK_SIZE-1)
+    {
+        _timer->cancel();
+    }
+    _tx_cnt++;
+    _lock.unlock();
     return ret;
 }
 
-std::function <void (void)> ncserver::_buid_timer_callback()
+bool ncserver::_send_remedy_pkt()
 {
-    /*
-     * TODO: Parallelize the encoding process using OpenMP or thread pool.
-     * NOTE: This function should be called by singleshottimer. Otherwise, its operation is undefied.
-     */
-    std::function <void (void)> ret = [&](){
-        std::lock_guard<std::mutex> lock(_lock);
-
-        int ret;
-        for(unsigned int tx = 0 ; tx < _redundant_pkts ; tx++)
+    if(_tx_cnt == 0)
+    {
+        return false;
+    }
+    for(unsigned int code = 0 ; code < _MAX_BLOCK_SIZE ; code++)
+    {
+        _rand_coef[code] = 1+rand()%255;
+    }
+    GET_BLK_SEQ(_remedy_pkt) = _blk_seq;
+    GET_BLK_SIZE(_remedy_pkt) = _MAX_BLOCK_SIZE;
+    for(unsigned int pkt = 0 ; pkt < _tx_cnt ; pkt++)
+    {
+        for(unsigned int position = OUTERHEADER_SIZE ; \
+            position < HEADER_SIZE(_MAX_BLOCK_SIZE)+GET_SIZE(_buffer[pkt])/*NOTE: 0^x = 0*/ ; \
+            position++)
         {
-            for(unsigned int code = 0 ; code < _MAX_BLOCK_SIZE ; code++)
+            (pkt == 0?_remedy_pkt[position] = FiniteField::instance()->mul(_buffer[pkt][position], _rand_coef[pkt]):_remedy_pkt[position] ^= FiniteField::instance()->mul(_buffer[pkt][position], _rand_coef[pkt]));
+        }
+    }
+    return sendto(_socket, _remedy_pkt, HEADER_SIZE(_MAX_BLOCK_SIZE)+_largest_pkt_size, 0, (sockaddr*)&_DATA_ADDR, sizeof(_DATA_ADDR))\
+               == (int)(HEADER_SIZE(_MAX_BLOCK_SIZE)+_largest_pkt_size);
+}
+
+void ncserver::_retransmission_handler()
+{
+    std::lock_guard<std::mutex> lock(_lock);
+    _state = REMEDY_TX;
+    if(_tx_cnt < _MAX_BLOCK_SIZE-1)
+    {
+        GET_BLK_SEQ(_remedy_pkt) = _blk_seq;
+        GET_BLK_SIZE(_remedy_pkt) = _MAX_BLOCK_SIZE;
+        GET_FLAGS(_remedy_pkt) = END_OF_BLK;
+        GET_SIZE(_remedy_pkt) = 0;
+        GET_LAST_INDICATOR(_remedy_pkt) = 0;
+        memset(GET_CODE(_remedy_pkt), 0x0, _MAX_BLOCK_SIZE);
+        if(sendto(_socket, _remedy_pkt, HEADER_SIZE(_MAX_BLOCK_SIZE), 0, (sockaddr*)&_DATA_ADDR, sizeof(_DATA_ADDR)) != (int)HEADER_SIZE(_MAX_BLOCK_SIZE))
+        {
+            std::cout << "Failed to send remedy pkt\n";
+        }
+    }
+    bool ack = false;
+    while(ack == false)
+    {
+        unsigned short int blk_seq = 0;
+        int ret = recvfrom(_socket, (void*)&blk_seq, sizeof(blk_seq), 0, NULL, NULL);
+        if(ret == sizeof(blk_seq))
+        {
+            if(blk_seq == _blk_seq)
             {
-                _rand_coef[code] = 1+rand()%255;
+                ack = true;
             }
-            GET_BLK_SEQ(_remedy_pkt) = _blk_seq;
-            GET_BLK_SIZE(_remedy_pkt) = _MAX_BLOCK_SIZE;
-            for(unsigned int pkt = 0 ; pkt < _tx_cnt ; pkt++)
-            {
-                for(unsigned int position = OUTERHEADER_SIZE ; \
-                      position < HEADER_SIZE(_MAX_BLOCK_SIZE)+GET_SIZE(_buffer[pkt])/*NOTE: 0^x = 0*/ ; \
-                      position++)
-                {
-                    (pkt == 0?_remedy_pkt[position] = FiniteField::instance()->mul(_buffer[pkt][position], _rand_coef[pkt]):_remedy_pkt[position] ^= FiniteField::instance()->mul(_buffer[pkt][position], _rand_coef[pkt]));
-                }
-            }
-            ret = sendto(_socket, _remedy_pkt, HEADER_SIZE(_MAX_BLOCK_SIZE)+_largest_pkt_size, 0, (sockaddr*)&_DATA_ADDR, sizeof(_DATA_ADDR));
-            if(ret == -1)
+        }
+        else
+        {
+            if(_send_remedy_pkt() == false)
             {
                 std::cout << "Failed to send remedy pkt\n";
             }
@@ -65,19 +142,18 @@ std::function <void (void)> ncserver::_buid_timer_callback()
                 std::cout << "Remedy Code: "<<0+GET_CODE(_remedy_pkt)[0]<<" "<<0+GET_CODE(_remedy_pkt)[1]<<" "<<0+GET_CODE(_remedy_pkt)[2]<<" "<<0+ GET_CODE(_remedy_pkt)[3]<<" "<<0+GET_CODE(_remedy_pkt)[4]<<std::endl;
             }
         }
-        _blk_seq++;
-        _tx_cnt = 0;
-        _largest_pkt_size = 0;
-    };
-    return ret;
+    }
+    _state = ORIGINAL_TX;
+    _blk_seq++;
+    _largest_pkt_size = 0;
+    _tx_cnt = 0;
 }
-
 
 bool ncserver::open_server()
 {
     std::lock_guard<std::mutex> lock(_lock);
     // Socket initialization
-    if(_is_opned == true)
+    if(_state == OPEN)
     {
         return true;
     }
@@ -92,8 +168,13 @@ bool ncserver::open_server()
         close(_socket);
         return false;
     }
-    timeval tv = {0, 500};
+    timeval tv = {0, 30};
     if(setsockopt(_socket, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) == -1)
+    {
+        close(_socket);
+        return false;
+    }
+    if(setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == -1)
     {
         close(_socket);
         return false;
@@ -168,7 +249,6 @@ bool ncserver::open_server()
     _tx_cnt = 0;
     _largest_pkt_size = 0;
     _blk_seq = 0;
-    _redundant_pkts = 2;
 
     try
     {
@@ -186,65 +266,15 @@ bool ncserver::open_server()
         close(_socket);
         return false;
     }
-    _is_opned = true;
+    _state = OPEN;
     return true;
-}
-
-unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_size)
-{
-    std::lock_guard<std::mutex> lock(_lock);
-    unsigned short int ret = 0;
-    if(_is_opned == false)
-    {
-        return 0;
-    }
-    if(pkt_size > MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE))
-    {
-        return 0; // I will support pkt_size larger than MAX_PAYLOAD_SIZE in the next phase.
-    }
-    if(_largest_pkt_size < pkt_size)
-    {
-        _largest_pkt_size = pkt_size;
-    }
-
-    GET_BLK_SEQ(_buffer[_tx_cnt]) = _blk_seq;
-    GET_BLK_SIZE(_buffer[_tx_cnt]) = _MAX_BLOCK_SIZE;
-    GET_SIZE(_buffer[_tx_cnt]) = pkt_size;
-    GET_LAST_INDICATOR(_buffer[_tx_cnt]) = 1; // I will support pkt_size larger than MAX_PAYLOAD_SIZE in the next phase.
-    memset(GET_CODE(_buffer[_tx_cnt]), 0x0, _MAX_BLOCK_SIZE);
-    GET_CODE(_buffer[_tx_cnt])[_tx_cnt] = 1;
-    memcpy(GET_PAYLOAD(_buffer[_tx_cnt], _MAX_BLOCK_SIZE), pkt, pkt_size);
-
-    if(sendto(_socket, _buffer[_tx_cnt], pkt_size + HEADER_SIZE(_MAX_BLOCK_SIZE), 0, (sockaddr*)&_DATA_ADDR, sizeof(_DATA_ADDR)) == (int)(pkt_size + HEADER_SIZE(_MAX_BLOCK_SIZE)))
-    {
-        ret = pkt_size;
-    }
-    else
-    {
-        ret = 0;
-    }
-    if(_tx_cnt == 0)
-    {
-        _tx_cnt++;
-        _timer->start(_TX_TIMEOUT, _CANCEL_CALLBACK, _TIMEOUT_CALLBACK);
-    }
-    else if(_tx_cnt < _MAX_BLOCK_SIZE-1)
-    {
-        _tx_cnt++;
-    }
-    else if(_tx_cnt == _MAX_BLOCK_SIZE-1)
-    {
-        _tx_cnt++;
-        _timer->cancel();
-    }
-    return ret;
 }
 
 void ncserver::close_server()
 {
     std::lock_guard<std::mutex> lock(_lock);
     // Socket initialization
-    if(_is_opned == false)
+    if(_state == CLOSE)
     {
         return;
     }
@@ -257,5 +287,5 @@ void ncserver::close_server()
     }
     delete []_buffer;
     close(_socket);
-    _is_opned = false;
+    _state = CLOSE;
 }
