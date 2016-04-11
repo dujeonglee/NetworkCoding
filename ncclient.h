@@ -9,19 +9,26 @@
 #include <thread>
 #include <mutex>
 
-class ncclient{
+class ncclient
+{
 private:
-    int _socket;
+    enum STATE: unsigned char
+    {
+        CLOSE = 0,
+        OPEN
+    };
     const sockaddr_in _DATA_ADDR;
     const unsigned char _MAX_BLOCK_SIZE;
+
+    STATE _state;
+    int _socket;
     std::thread _rx_thread;
     bool _rx_thread_running;
-    bool _exit_rx_thread;
     unsigned char _rx_buffer[1500];
     unsigned char _rank;
     unsigned char** _buffer;
     unsigned short int _blk_seq;
-    std::function <void (unsigned char *, unsigned int length)> _rx_handler;
+    std::function <void (unsigned char *, unsigned int length)> _receive_callback;
     std::mutex _lock;
 
 public:
@@ -29,11 +36,18 @@ public:
     ~ncclient();
 
 private:
-    sockaddr_in _build_addr(unsigned int ip, unsigned short int port);
-    static bool _is_original_pkt(unsigned char* pkt, unsigned int max_blk);
+    inline sockaddr_in _build_addr(unsigned int ip, unsigned short int port)
+    {
+        sockaddr_in ret = {0};
+        ret.sin_family = AF_INET;
+        ret.sin_addr.s_addr = htonl(ip);
+        ret.sin_port = htons(port);
+        return ret;
+    }
+    void _receive_handler();
 public:
-    bool open_client(std::function <void (unsigned char *, unsigned int length)> rx_handler);
     unsigned short int recv(unsigned char* pkt, unsigned short int pkt_size);
+    bool open_client(std::function <void (unsigned char *, unsigned int length)> rx_handler);
     void close_client();
 };
 #endif

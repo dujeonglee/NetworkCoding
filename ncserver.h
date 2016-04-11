@@ -9,7 +9,8 @@
 class ncserver
 {
 private:
-    enum STATE{
+    enum STATE: unsigned char
+    {
         CLOSE = 0,
         OPEN
     };
@@ -31,6 +32,7 @@ private:
 
 public:
     ncserver(unsigned int client_ip, unsigned short int port, unsigned char block_size, unsigned int timeout);
+    ncserver(unsigned short int svrport, unsigned int client_ip, unsigned short int cport, unsigned char block_size, unsigned int timeout);
     ~ncserver();
 
 private:
