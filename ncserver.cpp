@@ -177,6 +177,18 @@ void ncserver::_retransmission_handler()
                 ack = true;
                 std::cout <<"RECV ACK\n";
             }
+            else // sync block sequence number and retransmit original packets again
+            {
+                _blk_seq = blk_seq;
+                for(int i = 0 ; i < _tx_cnt ; i++)
+                {
+                    GET_BLK_SEQ(_buffer[i]) = _blk_seq;
+                    sendto(_socket, _buffer[i], GET_SIZE(_buffer[i]) + HEADER_SIZE(_MAX_BLOCK_SIZE), \
+                           0, \
+                           (sockaddr*)&_DATA_ADDR, sizeof(_DATA_ADDR));
+                }
+                std::cout <<"SYNC BLOCK SEQUENCE\n";
+            }
         }
         else
         {

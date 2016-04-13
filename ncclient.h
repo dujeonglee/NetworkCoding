@@ -26,6 +26,7 @@ private:
     bool _rx_thread_running;
     unsigned char _rx_buffer[1500];
     unsigned char _rank;
+    unsigned char _next_pkt_index;
     unsigned char** _buffer;
     unsigned short int _blk_seq;
     std::function <void (unsigned char *, unsigned int length)> _receive_callback;
