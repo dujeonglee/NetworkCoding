@@ -3,6 +3,7 @@
 #include <thread>
 #include <mutex>
 #include <functional>
+#include <iostream>
 
 class singleshottimer{
 private:
@@ -24,6 +25,7 @@ public:
         while(_is_running);
     };
     void start(unsigned int timeout_milles, std::function <void (void)> cancel_handler, std::function <void (void)> timeout_handler){
+        std::cout<<"Start\n";
         _timeout = timeout_milles;
         _cancel_handler = cancel_handler;
         _timeout_handler = timeout_handler;
@@ -47,6 +49,7 @@ public:
             _is_running = false;
         });
         _thread.detach();
+        std::cout<<"End\n";
     }
 
     void cancel(){

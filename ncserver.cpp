@@ -49,6 +49,11 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
         // This case is regarded as failure and an application should deal with this failure.
         return 0;
     }
+    if(_tx_cnt >= _MAX_BLOCK_SIZE)
+    {
+        _lock.unlock();
+        return 0;
+    }
     if(pkt_size > MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE))
     {
         // A single packet size is limitted to MAX_PAYLOAD_SIZE for the simplicity.
@@ -69,7 +74,6 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
         // Note: Packets with the same block ID will be encoded together to repair random packet losses.
         _largest_pkt_size = pkt_size;
     }
-
     // Fill-in header information
     GET_BLK_SEQ(_buffer[_tx_cnt]) = _blk_seq;
     GET_BLK_SIZE(_buffer[_tx_cnt]) = _MAX_BLOCK_SIZE;
@@ -98,7 +102,9 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
     if(_tx_cnt == 0)
     {
         // Start timer if this packet is the first packet in the block.
+        std::cout<<"Timer is started\n";
         _timer->start(_TX_TIMEOUT, [&](){this->_retransmission_handler();}, [&](){this->_retransmission_handler();});
+        //_timer->start(_TX_TIMEOUT, nullptr, [&](){this->_retransmission_handler();});
     }
     if(_tx_cnt == _MAX_BLOCK_SIZE-1)
     {
@@ -154,7 +160,7 @@ void ncserver::_retransmission_handler()
     {
         // In case of tx timeout, ncserver immediately send end of block with null data.
         GET_BLK_SEQ(_remedy_pkt) = _blk_seq;
-        GET_BLK_SIZE(_remedy_pkt) = _MAX_BLOCK_SIZE;
+        GET_BLK_SIZE(_remedy_pkt) = _tx_cnt;
         GET_FLAGS(_remedy_pkt) = FLAGS_END_OF_BLK;
         GET_SIZE(_remedy_pkt) = 0;
         GET_LAST_INDICATOR(_remedy_pkt) = 0;
@@ -195,10 +201,6 @@ void ncserver::_retransmission_handler()
             if(_send_remedy_pkt() == false)
             {
                 std::cout << "Failed to send remedy pkt\n";
-            }
-            else
-            {
-                std::cout << "Remedy Code: "<<0+GET_CODE(_remedy_pkt)[0]<<" "<<0+GET_CODE(_remedy_pkt)[1]<<" "<<0+GET_CODE(_remedy_pkt)[2]<<" "<<0+ GET_CODE(_remedy_pkt)[3]<<" "<<0+GET_CODE(_remedy_pkt)[4]<<std::endl;
             }
         }
     }

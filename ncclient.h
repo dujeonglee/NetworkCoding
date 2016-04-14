@@ -45,6 +45,8 @@ private:
         ret.sin_port = htons(port);
         return ret;
     }
+    unsigned char _code_size(unsigned char *pkt, bool original);
+    bool _inovative(unsigned char *pkt, int size);
     void _receive_handler();
 public:
     unsigned short int recv(unsigned char* pkt, unsigned short int pkt_size);

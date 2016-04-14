@@ -39,9 +39,6 @@ SINGLETON_PATTERN_INITIALIZATION_CPP(FiniteField)
             if(_mul_table[i][j-i] == 1)
             {
                 _inv_table[i] = j;
-            }
-            if(_mul_table[i][j-i] == 1)
-            {
                 _inv_table[j] = i;
             }
         }

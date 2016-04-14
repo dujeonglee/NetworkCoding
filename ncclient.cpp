@@ -14,6 +14,99 @@ ncclient::~ncclient()
     close_client();
 }
 
+unsigned char ncclient::_code_size(unsigned char *pkt, bool original)
+{
+    if((GET_FLAGS(pkt) & FLAGS_END_OF_BLK) == 0)
+    {
+        return 0;
+    }
+    if(original)
+    {
+        for(unsigned char ret = 0 ; ret < _MAX_BLOCK_SIZE ; ret++)
+        {
+            if(GET_CODE(pkt)[ret] == 1)
+            {
+                return ret+1;
+            }
+        }
+        return 0;
+    }
+    else
+    {
+        for(unsigned char ret = 0 ; ret < _MAX_BLOCK_SIZE ; ret++)
+        {
+            if(GET_CODE(pkt)[ret] == 0)
+            {
+                return ret;
+            }
+        }
+        return _MAX_BLOCK_SIZE;
+    }
+}
+
+bool ncclient::_inovative(unsigned char* pkt, int size)
+{
+    unsigned char* EMPTY_CODE = new unsigned char [_MAX_BLOCK_SIZE];
+    memset(EMPTY_CODE, 0x0, _MAX_BLOCK_SIZE);
+    if(_rank > 0)
+    {
+        for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+        {
+            if(memcmp(EMPTY_CODE, GET_CODE(_buffer[i]), _MAX_BLOCK_SIZE) == 0)
+            {
+                continue;
+            }
+            unsigned char mul = FiniteField::instance()->inv(GET_CODE(pkt)[i]);
+            for(unsigned int position = OUTERHEADER_SIZE ; \
+                position < HEADER_SIZE(_MAX_BLOCK_SIZE)+size ; \
+                position++)
+            {
+                pkt[position] = FiniteField::instance()->mul(pkt[position], mul);
+                pkt[position] = pkt[position] ^ _buffer[i][position];
+            }
+        }
+    }
+    int inovative_code = 0;
+    for(inovative_code = 0 ; inovative_code < _MAX_BLOCK_SIZE ; inovative_code++)
+    {
+        if(GET_CODE(pkt)[inovative_code] != 0)
+        {
+            break;
+        }
+    }
+    if(inovative_code < _MAX_BLOCK_SIZE)
+    {
+        memcpy(_buffer[inovative_code], pkt, OUTERHEADER_SIZE);
+        unsigned char mul = FiniteField::instance()->inv(GET_CODE(pkt)[inovative_code]);
+        for(unsigned int position = OUTERHEADER_SIZE ; \
+            position < HEADER_SIZE(_MAX_BLOCK_SIZE)+size ; \
+            position++)
+        {
+            _buffer[inovative_code][position] = FiniteField::instance()->mul(pkt[position], mul);
+        }
+        for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+        {
+            if(i  == inovative_code)
+            {
+                continue;
+            }
+            if(memcmp(EMPTY_CODE, GET_CODE(_buffer[i]), _MAX_BLOCK_SIZE) == 0)
+            {
+                continue;
+            }
+            unsigned char mul = GET_CODE(_buffer[i])[inovative_code];
+            for(unsigned int position = OUTERHEADER_SIZE ; \
+                position < HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE); \
+                position++)
+            {
+                _buffer[i][position] = FiniteField::instance()->mul(_buffer[inovative_code][position], mul) ^ _buffer[i][position];
+            }
+        }
+    }
+    delete [] EMPTY_CODE;
+    return inovative_code < _MAX_BLOCK_SIZE;
+}
+
 void ncclient::_receive_handler()
 {
     while(_rx_thread_running)
@@ -87,7 +180,8 @@ void ncclient::_receive_handler()
                     _receive_callback(GET_PAYLOAD(_rx_buffer, _MAX_BLOCK_SIZE), ret - HEADER_SIZE(_MAX_BLOCK_SIZE));
                 }
                 _lock.unlock();
-                if((GET_FLAGS(_rx_buffer) & FLAGS_END_OF_BLK))
+                unsigned char code_size = _code_size(_rx_buffer, true);
+                if((GET_FLAGS(_rx_buffer) & FLAGS_END_OF_BLK) && _rank == code_size)
                 {
                     ret = sendto(_socket, (void*)&blk_seq, sizeof(blk_seq), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
                     if(ret<=0)
@@ -108,7 +202,54 @@ void ncclient::_receive_handler()
         }
         else // Remedy packet
         {
-
+            unsigned char code_size = _code_size(_rx_buffer, false);
+            if(code_size == 0)
+            {
+                if(_rank == GET_BLK_SIZE(_rx_buffer))
+                {
+                    ret = sendto(_socket, (void*)&blk_seq, sizeof(blk_seq), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
+                    if(ret<=0)
+                    {
+                        std::cout<<"Could not send ack\n";
+                    }
+                    _rank = 0;
+                    _next_pkt_index = 0;
+                    for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+                    {
+                        memset(_buffer[i], 0x0, HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
+                    }
+                }
+            }
+            else
+            {
+                if(_inovative(_rx_buffer, ret) == true)
+                {
+                    _rank++;
+                }
+                if(_rank == code_size)
+                {
+                    std::cout <<0+blk_seq<<" OK Decode\n";
+                    for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+                    {
+                        for(int j = 0 ; j < _MAX_BLOCK_SIZE ; j++)
+                        {
+                            std::cout<<0+GET_CODE(_buffer[i])[j]<<" ";
+                        }
+                        std::cout <<"\n";
+                    }
+                    ret = sendto(_socket, (void*)&blk_seq, sizeof(blk_seq), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
+                    if(ret<=0)
+                    {
+                        std::cout<<"Could not send ack\n";
+                    }
+                    _rank = 0;
+                    _next_pkt_index = 0;
+                    for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+                    {
+                        memset(_buffer[i], 0x0, HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
+                    }
+                }
+            }
         }
     }
 }
