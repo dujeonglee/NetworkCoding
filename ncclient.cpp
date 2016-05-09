@@ -95,12 +95,16 @@ void ncclient::_receive_handler()
         {
             continue;
         }
+#ifdef RANDOM_PKT_LOSS
+        /*
+         * Random Packet Loss
+         */
         if(rand()%5 == 0)
         {
             std::cout<<"Drop\n";
             continue;
         }
-
+#endif
         const unsigned short int blk_seq = GET_OUTER_BLK_SEQ(_rx_buffer);
         /*
          * A change on a block sequence number indicates start of new block.

@@ -4,8 +4,6 @@
 #include <exception>
 #include <string.h>
 #include <iostream>
-#include <thread>
-//#include <stdio.h>
 
 /*
  * Constructor: Initialize const values and set _state as CLOSE.

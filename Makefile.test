@@ -8,10 +8,10 @@ LIBRARY := -lpthread
 CPP := g++
 TARGET = test
 
-all : DEBUG
+all : debug
 
-$(TARGET) : $(OBJECTS)  $(LIBRARY)
-	$(CPP) -o $@  $^ 
+$(TARGET) : $(OBJECTS)
+	$(CPP) -o $@  $^ -pg $(LIBRARY)
 
 .cpp.o : $(SOURCES)
 	$(CPP) $(SOURCES) $(CPPFLAGS) $(INCLUDES) $(LIBRARY)
@@ -19,8 +19,8 @@ $(TARGET) : $(OBJECTS)  $(LIBRARY)
 clean :
 	rm -rf $(OBJECTS) $(TARGET) *~
 
-DEBUG : CPPFLAGS := -g -c -Wall -Werror -std=c++11 -fopenmp
-DEBUG : $(TARGET)
+debug : CPPFLAGS := -g -pg -c -Wall -Werror -std=c++11 -fopenmp -DRANDOM_PKT_LOSS
+debug : $(TARGET)
 
-RELEASE : CPPFLAGS := -O0 -c -Wall -Werror -std=c++11 -fopenmp
-RELEASE : $(TARGET)
+release : CPPFLAGS := -O0 -c -Wall -Werror -std=c++11 -fopenmp
+release : $(TARGET)
