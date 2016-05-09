@@ -14,97 +14,74 @@ ncclient::~ncclient()
     close_client();
 }
 
-unsigned char ncclient::_code_size(unsigned char *pkt, bool original)
-{
-    if((GET_FLAGS(pkt) & FLAGS_END_OF_BLK) == 0)
-    {
-        return 0;
-    }
-    if(original)
-    {
-        for(unsigned char ret = 0 ; ret < _MAX_BLOCK_SIZE ; ret++)
-        {
-            if(GET_CODE(pkt)[ret] == 1)
-            {
-                return ret+1;
-            }
-        }
-        return 0;
-    }
-    else
-    {
-        for(unsigned char ret = 0 ; ret < _MAX_BLOCK_SIZE ; ret++)
-        {
-            if(GET_CODE(pkt)[ret] == 0)
-            {
-                return ret;
-            }
-        }
-        return _MAX_BLOCK_SIZE;
-    }
-}
-
 bool ncclient::_inovative(unsigned char* pkt, int size)
 {
     unsigned char* EMPTY_CODE = new unsigned char [_MAX_BLOCK_SIZE];
     memset(EMPTY_CODE, 0x0, _MAX_BLOCK_SIZE);
-    if(_rank > 0)
+
+    int inovative_index = -1;
+    for(unsigned char i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
     {
-        for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+        if(memcmp(EMPTY_CODE, GET_INNER_CODE(_buffer[i]), _MAX_BLOCK_SIZE) == 0)
         {
-            if(memcmp(EMPTY_CODE, GET_CODE(_buffer[i]), _MAX_BLOCK_SIZE) == 0)
+            if(inovative_index == -1)
+            {
+                inovative_index = (int)i;
+            }
+            continue;
+        }
+        {
+            if(GET_INNER_CODE(pkt)[i] == 0)
             {
                 continue;
             }
-            unsigned char mul = FiniteField::instance()->inv(GET_CODE(pkt)[i]);
-            for(unsigned int position = OUTERHEADER_SIZE ; \
-                position < HEADER_SIZE(_MAX_BLOCK_SIZE)+size ; \
-                position++)
+            const unsigned char mul = FiniteField::instance()->inv(GET_INNER_CODE(pkt)[i]);
+            for(unsigned int position = OUTER_HEADER_SIZE ; position < (GET_OUTER_SIZE(pkt)<GET_OUTER_SIZE(_buffer[i])?GET_OUTER_SIZE(pkt):GET_OUTER_SIZE(_buffer[i])) ; position++)
             {
-                pkt[position] = FiniteField::instance()->mul(pkt[position], mul);
-                pkt[position] = pkt[position] ^ _buffer[i][position];
+                pkt[position] = FiniteField::instance()->mul(pkt[position], mul) ^ _buffer[i][position];
             }
         }
     }
-    int inovative_code = 0;
-    for(inovative_code = 0 ; inovative_code < _MAX_BLOCK_SIZE ; inovative_code++)
+    if(inovative_index == -1)
     {
-        if(GET_CODE(pkt)[inovative_code] != 0)
-        {
-            break;
-        }
+        return false;
     }
-    if(inovative_code < _MAX_BLOCK_SIZE)
+
     {
-        memcpy(_buffer[inovative_code], pkt, OUTERHEADER_SIZE);
-        unsigned char mul = FiniteField::instance()->inv(GET_CODE(pkt)[inovative_code]);
-        for(unsigned int position = OUTERHEADER_SIZE ; \
-            position < HEADER_SIZE(_MAX_BLOCK_SIZE)+size ; \
-            position++)
+        const unsigned char mul = FiniteField::instance()->inv(GET_INNER_CODE(pkt)[inovative_index]);
+        for(unsigned int position = OUTER_HEADER_SIZE ; position < GET_OUTER_SIZE(pkt) ; position++)
         {
-            _buffer[inovative_code][position] = FiniteField::instance()->mul(pkt[position], mul);
-        }
-        for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
-        {
-            if(i  == inovative_code)
-            {
-                continue;
-            }
-            if(memcmp(EMPTY_CODE, GET_CODE(_buffer[i]), _MAX_BLOCK_SIZE) == 0)
-            {
-                continue;
-            }
-            unsigned char mul = GET_CODE(_buffer[i])[inovative_code];
-            for(unsigned int position = OUTERHEADER_SIZE ; \
-                position < HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE); \
-                position++)
-            {
-                _buffer[i][position] = FiniteField::instance()->mul(_buffer[inovative_code][position], mul) ^ _buffer[i][position];
-            }
+            pkt[position] = FiniteField::instance()->mul(pkt[position], mul);
         }
     }
+
+    memcpy(_buffer[inovative_index], pkt, GET_OUTER_SIZE(pkt));
+
     delete [] EMPTY_CODE;
-    return inovative_code < _MAX_BLOCK_SIZE;
+    return inovative_index < _MAX_BLOCK_SIZE;
+}
+
+void ncclient::_decode()
+{
+    for(int i = _MAX_BLOCK_SIZE-1 ; i > -1 ; i--)
+    {
+        if(GET_INNER_CODE(_buffer[i])[i] != 1)
+        {
+            continue;
+        }
+        for(int j = i-1 ; j > -1 ; j--)
+        {
+            if(GET_INNER_CODE(_buffer[j])[i] == 0)
+            {
+                continue;
+            }
+            const unsigned char mul = GET_INNER_CODE(_buffer[j])[i];
+            for(unsigned int position = OUTER_HEADER_SIZE ; position < (GET_OUTER_SIZE(_buffer[i])<GET_OUTER_SIZE(_buffer[j])?GET_OUTER_SIZE(_buffer[i]):GET_OUTER_SIZE(_buffer[j])) ; position++)
+            {
+                _buffer[j][position] = _buffer[j][position] ^ FiniteField::instance()->mul(_buffer[i][position], mul);
+            }
+        }
+    }
 }
 
 void ncclient::_receive_handler()
@@ -118,73 +95,48 @@ void ncclient::_receive_handler()
         {
             continue;
         }
-
-        const unsigned short int blk_seq = GET_BLK_SEQ(_rx_buffer);
-        if(blk_seq != _blk_seq)
+        if(rand()%5 == 0)
         {
-            if(_rank == 0 && blk_seq == (_blk_seq < 0xffff ? _blk_seq + 1 : 1 )) // New block is started
-            {
-                _blk_seq = blk_seq;
-                _rank = 0;
-                _next_pkt_index = 0;
-                for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
-                {
-                    memset(_buffer[i], 0x0, HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
-                }
-            }
-            else
-            {
-                /*
-                 * Receive packets not associated with the current block.
-                 * Discard the data packet and send an ack packet with the current block sequence number.
-                 * Server should adjust its block sequence number with the sequence in the ack packet and retransmit all packets in the current block again.
-                 */
-                if((GET_FLAGS(_rx_buffer) & FLAGS_END_OF_BLK))
-                {
-                    ret = sendto(_socket, (void*)&_blk_seq, sizeof(_blk_seq), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
-                    if(ret<=0)
-                    {
-                        std::cout<<"Could not send ack\n";
-                    }
-                    _rank = 0;
-                    _next_pkt_index = 0;
-                    for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
-                    {
-                        memset(_buffer[i], 0x0, HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
-                    }
-                }
-                continue;
-            }
+            std::cout<<"Drop\n";
+            continue;
         }
 
+        const unsigned short int blk_seq = GET_OUTER_BLK_SEQ(_rx_buffer);
         /*
-         * Receive packets associated with the current block.
+         * A change on a block sequence number indicates start of new block.
+         * We need to flush rx buffers.
          */
-        const unsigned char* code = GET_CODE(_rx_buffer);
-         int index = -1;
-        for(unsigned int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+        if(_blk_seq != blk_seq)
         {
-            if(code[i] == 1)
+            _blk_seq = blk_seq;
+            _rank = 0;
+            _next_pkt_index = 0;
+            for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
             {
-                index = i;
+                memset(_buffer[i], 0x0, TOTAL_HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
             }
         }
-        if(index > -1) // Original packet
+
+        const int index = (GET_OUTER_FLAGS(_rx_buffer) & OuterHeader::FLAGS_ORIGINAL?GET_OUTER_BLK_SIZE(_rx_buffer):0) - 1;
+        if(index != -1) // Original packet
         {
             memcpy(_buffer[index], _rx_buffer, ret);
-            if(_rank == _next_pkt_index)
+            if(index == _next_pkt_index)
             {
                 _lock.lock();
                 if(_receive_callback != nullptr)
                 {
-                    _receive_callback(GET_PAYLOAD(_rx_buffer, _MAX_BLOCK_SIZE), ret - HEADER_SIZE(_MAX_BLOCK_SIZE));
+                    _receive_callback(GET_INNER_PAYLOAD(_rx_buffer, _MAX_BLOCK_SIZE), GET_INNER_SIZE(_rx_buffer));
+                    _next_pkt_index++;
                 }
                 _lock.unlock();
-                unsigned char code_size = _code_size(_rx_buffer, true);
-                if((GET_FLAGS(_rx_buffer) & FLAGS_END_OF_BLK) && _rank == code_size)
+                if( (_rank == GET_OUTER_BLK_SIZE(_rx_buffer)-1) && (GET_OUTER_FLAGS(_rx_buffer) & OuterHeader::FLAGS_END_OF_BLK))
                 {
-                    ret = sendto(_socket, (void*)&blk_seq, sizeof(blk_seq), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
-                    if(ret<=0)
+                    printf("Send ACK\n");
+                    Ack ack_pkt;
+                    ack_pkt.blk_seq = _blk_seq;
+                    ret = sendto(_socket, (void*)&ack_pkt, sizeof(ack_pkt), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
+                    if(ret!=sizeof(ack_pkt))
                     {
                         std::cout<<"Could not send ack\n";
                     }
@@ -192,62 +144,43 @@ void ncclient::_receive_handler()
                     _next_pkt_index = 0;
                     for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
                     {
-                        memset(_buffer[i], 0x0, HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
+                        memset(_buffer[i], 0x0, TOTAL_HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
                     }
                     continue;
                 }
-                _next_pkt_index++;
             }
             _rank++;
         }
         else // Remedy packet
         {
-            unsigned char code_size = _code_size(_rx_buffer, false);
-            if(code_size == 0)
+            if(_inovative(_rx_buffer, ret) == true)
             {
-                if(_rank == GET_BLK_SIZE(_rx_buffer))
-                {
-                    ret = sendto(_socket, (void*)&blk_seq, sizeof(blk_seq), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
-                    if(ret<=0)
-                    {
-                        std::cout<<"Could not send ack\n";
-                    }
-                    _rank = 0;
-                    _next_pkt_index = 0;
-                    for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
-                    {
-                        memset(_buffer[i], 0x0, HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
-                    }
-                }
+                _rank++;
             }
-            else
+            if(_rank == GET_OUTER_BLK_SIZE(_rx_buffer))
             {
-                if(_inovative(_rx_buffer, ret) == true)
+                _decode();
+                for(; _next_pkt_index < GET_OUTER_BLK_SIZE(_rx_buffer) ; )
                 {
-                    _rank++;
+                    _lock.lock();
+                    _receive_callback(GET_INNER_PAYLOAD(_buffer[_next_pkt_index], _MAX_BLOCK_SIZE),
+                                      GET_INNER_SIZE(_buffer[_next_pkt_index]));
+                    _next_pkt_index++;
+                    _lock.unlock();
                 }
-                if(_rank == code_size)
+                printf("Send ACK\n");
+                Ack ack_pkt;
+                ack_pkt.blk_seq = _blk_seq;
+                ret = sendto(_socket, (void*)&ack_pkt, sizeof(ack_pkt), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
+                if(ret!=sizeof(ack_pkt))
                 {
-                    std::cout <<0+blk_seq<<" OK Decode\n";
-                    for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
-                    {
-                        for(int j = 0 ; j < _MAX_BLOCK_SIZE ; j++)
-                        {
-                            std::cout<<0+GET_CODE(_buffer[i])[j]<<" ";
-                        }
-                        std::cout <<"\n";
-                    }
-                    ret = sendto(_socket, (void*)&blk_seq, sizeof(blk_seq), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
-                    if(ret<=0)
-                    {
-                        std::cout<<"Could not send ack\n";
-                    }
-                    _rank = 0;
-                    _next_pkt_index = 0;
-                    for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
-                    {
-                        memset(_buffer[i], 0x0, HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
-                    }
+                    std::cout<<"Could not send ack\n";
+                }
+                _rank = 0;
+                _next_pkt_index = 0;
+                for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+                {
+                    memset(_buffer[i], 0x0, TOTAL_HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
                 }
             }
         }
@@ -310,7 +243,7 @@ bool ncclient::open_client(std::function <void (unsigned char*, unsigned int len
     int buffer_index = 0;
     try{
         for(buffer_index = 0 ; buffer_index < (int)_MAX_BLOCK_SIZE ; buffer_index++){
-            _buffer[buffer_index] = new unsigned char[HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE)];
+            _buffer[buffer_index] = new unsigned char[TOTAL_HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE)];
         }
     }catch(std::exception &ex){
         for(--buffer_index; buffer_index >-1 ; buffer_index--){
@@ -341,18 +274,18 @@ void ncclient::close_client()
     {
         return;
     }
-     _rx_thread_running = false;
-     _rx_thread.join();
+    _rx_thread_running = false;
+    _rx_thread.join();
 
-     _receive_callback = nullptr;
+    _receive_callback = nullptr;
 
-     for(unsigned int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
-     {
-         delete [] (_buffer[i]);
-     }
-     delete []_buffer;
-     _buffer = nullptr;
-     close(_socket);
-     _socket = -1;
-     _state = ncclient::CLOSE;
+    for(unsigned int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+    {
+        delete [] (_buffer[i]);
+    }
+    delete []_buffer;
+    _buffer = nullptr;
+    close(_socket);
+    _socket = -1;
+    _state = ncclient::CLOSE;
 }

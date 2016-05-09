@@ -1,10 +1,11 @@
 #ifndef NCSERVER_H_
 #define NCSERVER_H_
-#include "singleshottimer.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <unistd.h>
+#include <mutex>
+
 
 class ncserver
 {
@@ -14,20 +15,56 @@ private:
         CLOSE = 0,
         OPEN
     };
+    /*
+     * Control channel address
+     */
     const sockaddr_in _CTRL_ADDR;
+    /*
+     * Data channel address
+     */
     const sockaddr_in _DATA_ADDR;
+    /*
+     * Maximum number of packets in a network coding block.
+     */
     const unsigned char _MAX_BLOCK_SIZE;
-    const unsigned int _TX_TIMEOUT;
 
+    /*
+     * State of network coding server. Either CLOSE or OPEN.
+     */
     STATE _state;
+
+    /*
+     * Socket descriptor for control and data channel
+     */
     int _socket;
+
+    /*
+     * Array of packets in the network coding block
+     */
     unsigned char** _buffer;
+    /*
+     * Random coefficients
+     */
 	unsigned char* _rand_coef;
+    /*
+     * Buffer for remedy packet
+     */
 	unsigned char* _remedy_pkt;
+    /*
+     * Number of packets transmitted for this block
+     */
     unsigned char _tx_cnt;
+    /*
+     * The largest packet size in this block
+     */
     unsigned short int _largest_pkt_size;
+    /*
+     * Server sequence
+     */
     unsigned short int _blk_seq;
-    singleshottimer* _timer;
+    /*
+     * Lock
+     */
     std::mutex _lock;
 
 public:
@@ -46,10 +83,9 @@ private:
     }
 
     bool _send_remedy_pkt();
-    void _retransmission_handler();
 
 public:
-    unsigned short int send(unsigned char* pkt, unsigned short int pkt_size);
+    unsigned short int send(unsigned char* pkt, unsigned short int pkt_size, const bool complete_block);
     bool open_server();
     void close_server();
 };
