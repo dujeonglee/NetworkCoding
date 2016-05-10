@@ -4,8 +4,20 @@
 #include "ncclient.h"
 #include "finite_field.h"
 
+int data = 0;
 void rx(unsigned char* buff, unsigned int size){
-    printf("RX %s", (char*)buff);
+	printf("RX: %s", buff);
+	int tmp;
+	sscanf((char*)buff, "%d\n", &tmp);
+	if(tmp == data)
+	{
+		data++;
+	}
+	else
+	{
+		printf("Wrong\n");
+		exit(-1);
+	}
 }
 
 int main()
@@ -32,10 +44,10 @@ int main()
     do{
         memset(data, 0x0, 10);
         sprintf(data, "%d\n", i);
-        if(_nc_server.send((unsigned char*)data, 4+rand()%7, rand()%5 == 0) > 0){
+        if(_nc_server.send((unsigned char*)data, 10, false) > 0){
             i++;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }while(true);
     std::cout <<"sleep\n";
 
