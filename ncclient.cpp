@@ -36,7 +36,7 @@ bool ncclient::_inovative(unsigned char* pkt, int size)
                 continue;
             }
             const unsigned char mul = FiniteField::instance()->inv(GET_INNER_CODE(pkt)[i]);
-            for(unsigned int position = OUTER_HEADER_SIZE ; position < (GET_OUTER_SIZE(pkt)<GET_OUTER_SIZE(_buffer[i])?GET_OUTER_SIZE(pkt):GET_OUTER_SIZE(_buffer[i])) ; position++)
+            for(unsigned int position = OUTER_HEADER_SIZE ; position < (GET_OUTER_SIZE(pkt)>GET_OUTER_SIZE(_buffer[i])?GET_OUTER_SIZE(pkt):GET_OUTER_SIZE(_buffer[i])) ; position++)
             {
                 pkt[position] = FiniteField::instance()->mul(pkt[position], mul) ^ _buffer[i][position];
             }
@@ -76,7 +76,8 @@ void ncclient::_decode()
                 continue;
             }
             const unsigned char mul = GET_INNER_CODE(_buffer[j])[i];
-            for(unsigned int position = OUTER_HEADER_SIZE ; position < (GET_OUTER_SIZE(_buffer[i])<GET_OUTER_SIZE(_buffer[j])?GET_OUTER_SIZE(_buffer[i]):GET_OUTER_SIZE(_buffer[j])) ; position++)
+            for(unsigned int position = OUTER_HEADER_SIZE ; 
+			position < (GET_OUTER_SIZE(_buffer[i])<GET_OUTER_SIZE(_buffer[j])?GET_OUTER_SIZE(_buffer[i]):GET_OUTER_SIZE(_buffer[j])) ; position++)
             {
                 _buffer[j][position] = _buffer[j][position] ^ FiniteField::instance()->mul(_buffer[i][position], mul);
             }
