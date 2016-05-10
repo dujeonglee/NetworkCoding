@@ -102,9 +102,8 @@ void ncclient::_receive_handler()
         /*
          * Random Packet Loss
          */
-        if(rand()%5 == 0)
+        if(rand()%2 == 0)
         {
-            std::cout<<"Drop\n";
             continue;
         }
 #endif
@@ -139,7 +138,6 @@ void ncclient::_receive_handler()
                 _lock.unlock();
                 if( (_rank == GET_OUTER_BLK_SIZE(_rx_buffer)-1) && (GET_OUTER_FLAGS(_rx_buffer) & OuterHeader::FLAGS_END_OF_BLK))
                 {
-                    printf("Send ACK\n");
                     Ack ack_pkt;
                     ack_pkt.blk_seq = _blk_seq;
                     ret = sendto(_socket, (void*)&ack_pkt, sizeof(ack_pkt), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
@@ -179,7 +177,6 @@ void ncclient::_receive_handler()
 						_lock.unlock();
 					}
 				}
-                printf("Send ACK\n");
                 Ack ack_pkt;
                 ack_pkt.blk_seq = _blk_seq;
                 ret = sendto(_socket, (void*)&ack_pkt, sizeof(ack_pkt), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
