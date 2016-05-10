@@ -36,14 +36,16 @@ bool ncclient::_inovative(unsigned char* pkt, int size)
                 continue;
             }
             const unsigned char mul = FiniteField::instance()->inv(GET_INNER_CODE(pkt)[i]);
-            for(unsigned int position = OUTER_HEADER_SIZE ; position < (GET_OUTER_SIZE(pkt)>GET_OUTER_SIZE(_buffer[i])?GET_OUTER_SIZE(pkt):GET_OUTER_SIZE(_buffer[i])) ; position++)
+            for(unsigned int position = OUTER_HEADER_SIZE ; position < (GET_OUTER_SIZE(pkt)<GET_OUTER_SIZE(_buffer[i])?GET_OUTER_SIZE(pkt):GET_OUTER_SIZE(_buffer[i])) ; position++)
             {
                 pkt[position] = FiniteField::instance()->mul(pkt[position], mul) ^ _buffer[i][position];
             }
         }
     }
-    if(inovative_index == -1)
+	/* Remedy packet is not innovative. We simply discard the packet. */
+    if(inovative_index == -1 || GET_INNER_CODE(pkt)[inovative_index] == 0)
     {
+		delete [] EMPTY_CODE;
         return false;
     }
 
@@ -158,21 +160,25 @@ void ncclient::_receive_handler()
         }
         else // Remedy packet
         {
-            if(_inovative(_rx_buffer, ret) == true)
+			bool local_deliver = false;
+            if((local_deliver = (_inovative(_rx_buffer, ret) == true)))
             {
                 _rank++;
             }
             if(_rank == GET_OUTER_BLK_SIZE(_rx_buffer))
             {
-                _decode();
-                for(; _next_pkt_index < GET_OUTER_BLK_SIZE(_rx_buffer) ; )
-                {
-                    _lock.lock();
-                    _receive_callback(GET_INNER_PAYLOAD(_buffer[_next_pkt_index], _MAX_BLOCK_SIZE),
-                                      GET_INNER_SIZE(_buffer[_next_pkt_index]));
-                    _next_pkt_index++;
-                    _lock.unlock();
-                }
+				if(local_deliver)
+				{
+					_decode();
+					for(; _next_pkt_index < GET_OUTER_BLK_SIZE(_rx_buffer) ; )
+					{
+						_lock.lock();
+						_receive_callback(GET_INNER_PAYLOAD(_buffer[_next_pkt_index], _MAX_BLOCK_SIZE),
+										  GET_INNER_SIZE(_buffer[_next_pkt_index]));
+						_next_pkt_index++;
+						_lock.unlock();
+					}
+				}
                 printf("Send ACK\n");
                 Ack ack_pkt;
                 ack_pkt.blk_seq = _blk_seq;
