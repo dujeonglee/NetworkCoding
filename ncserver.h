@@ -27,7 +27,7 @@ private:
     /*
      * Maximum number of packets in a network coding block.
      */
-    const unsigned char _MAX_BLOCK_SIZE;
+    const BLOCK_SIZE _MAX_BLOCK_SIZE;
 
     const unsigned int _TIMEOUT;
 
