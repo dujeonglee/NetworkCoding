@@ -3,60 +3,47 @@
 #include <string.h>
 #include <iostream>
 
-#define UNROLL_MATRIX_MULTIPLICATION_2(output, position, row_index) \
-{\
-    unsigned char tmp = 0;\
-    tmp = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
-    output[position] = tmp;\
-}
+#define UNROLL_MATRIX_MULTIPLICATION_2(output, position, row_index, accumulator) \
+accumulator = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
+output[position] = accumulator
 
-#define UNROLL_MATRIX_MULTIPLICATION_4(output, position, row_index) \
-{\
-    unsigned char tmp = 0;\
-    tmp = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[2], _buffer[2].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[3], _buffer[3].buffer[position]);\
-    output[position] = tmp;\
-}
+#define UNROLL_MATRIX_MULTIPLICATION_4(output, position, row_index, accumulator) \
+accumulator = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[2], _buffer[2].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[3], _buffer[3].buffer[position]);\
+output[position] = accumulator
 
-#define UNROLL_MATRIX_MULTIPLICATION_8(output, position, row_index) \
-{\
-    unsigned char tmp = 0;\
-    tmp = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[2], _buffer[2].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[3], _buffer[3].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[4], _buffer[4].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[5], _buffer[5].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[6], _buffer[6].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[7], _buffer[7].buffer[position]);\
-    output[position] = tmp;\
-}
+#define UNROLL_MATRIX_MULTIPLICATION_8(output, position, row_index, accumulator) \
+accumulator = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[2], _buffer[2].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[3], _buffer[3].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[4], _buffer[4].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[5], _buffer[5].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[6], _buffer[6].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[7], _buffer[7].buffer[position]);\
+output[position] = accumulator
 
-#define UNROLL_MATRIX_MULTIPLICATION_16(output, position, row_index) \
-{\
-    unsigned char tmp = 0;\
-    tmp = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[2], _buffer[2].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[3], _buffer[3].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[4], _buffer[4].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[5], _buffer[5].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[6], _buffer[6].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[7], _buffer[7].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[8], _buffer[8].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[9], _buffer[9].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[10], _buffer[10].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[11], _buffer[11].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[12], _buffer[12].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[13], _buffer[13].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[14], _buffer[14].buffer[position]);\
-    tmp ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[15], _buffer[15].buffer[position]);\
-    output[position] = tmp;\
-}
-
+#define UNROLL_MATRIX_MULTIPLICATION_16(output, position, row_index, accumulator) \
+accumulator = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[2], _buffer[2].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[3], _buffer[3].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[4], _buffer[4].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[5], _buffer[5].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[6], _buffer[6].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[7], _buffer[7].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[8], _buffer[8].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[9], _buffer[9].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[10], _buffer[10].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[11], _buffer[11].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[12], _buffer[12].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[13], _buffer[13].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[14], _buffer[14].buffer[position]);\
+accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[15], _buffer[15].buffer[position]);\
+output[position] = accumulator
 
 unsigned int ori = 0;
 unsigned int coding = 0;
@@ -285,19 +272,20 @@ bool ncclient::_handle_remedy_packet(unsigned char *pkt, int size)
                         }
                         else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 0)
                         {
+                            unsigned char accumulator;
                             switch(_MAX_BLOCK_SIZE)
                             {
                             case 2:
-                                UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, decoding_position, i);
+                                UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, decoding_position, i, accumulator);
                                 break;
                             case 4:
-                                UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, decoding_position, i);
+                                UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, decoding_position, i, accumulator);
                                 break;
                             case 8:
-                                UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, decoding_position, i);
+                                UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, decoding_position, i, accumulator);
                                 break;
                             case 16:
-                                UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, decoding_position, i);
+                                UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, decoding_position, i, accumulator);
                                 break;
                             }
                             decoding_position+=1;
@@ -397,180 +385,184 @@ void ncclient::_receive_handler()
 
 void ncclient::_unroll_decode_2(unsigned char *output, unsigned short position, unsigned char row_index)
 {
+    unsigned char accumulator;
     switch(_MAX_BLOCK_SIZE)
     {
     case 2:
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index, accumulator);
         break;
     case 4:
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index, accumulator);
         break;
     case 8:
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index, accumulator);
         break;
     case 16:
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index, accumulator);
         break;
     }
 }
 
 void ncclient::_unroll_decode_4(unsigned char *output, unsigned short position, unsigned char row_index)
 {
+    unsigned char accumulator;
     switch(_MAX_BLOCK_SIZE)
     {
     case 2:
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+3, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+3, row_index, accumulator);
         break;
     case 4:
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+3, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+3, row_index, accumulator);
         break;
     case 8:
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+3, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+3, row_index, accumulator);
         break;
     case 16:
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+3, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+3, row_index, accumulator);
         break;
     }
 }
 
 void ncclient::_unroll_decode_8(unsigned char *output, unsigned short position, unsigned char row_index)
 {
+    unsigned char accumulator;
     switch(_MAX_BLOCK_SIZE)
     {
     case 2:
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+3, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+4, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+5, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+6, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+7, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+7, row_index, accumulator);
         break;
     case 4:
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+3, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+4, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+5, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+6, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+7, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+7, row_index, accumulator);
         break;
     case 8:
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+3, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+4, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+5, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+6, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+7, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+7, row_index, accumulator);
         break;
     case 16:
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+3, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+4, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+5, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+6, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+7, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+7, row_index, accumulator);
         break;
     }
 }
 
 void ncclient::_unroll_decode_16(unsigned char *output, unsigned short position, unsigned char row_index)
 {
+    unsigned char accumulator;
     switch(_MAX_BLOCK_SIZE)
     {
     case 2:
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+3, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+4, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+5, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+6, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+7, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+8, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+9, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+10, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+11, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+12, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+13, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+14, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+15, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+8, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+9, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+10, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+11, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+12, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+13, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+14, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+15, row_index, accumulator);
         break;
     case 4:
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+3, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+4, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+5, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+6, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+7, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+8, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+9, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+10, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+11, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+12, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+13, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+14, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+15, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+8, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+9, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+10, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+11, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+12, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+13, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+14, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+15, row_index, accumulator);
         break;
     case 8:
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+3, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+4, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+5, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+6, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+7, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+8, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+9, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+10, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+11, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+12, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+13, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+14, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+15, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+8, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+9, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+10, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+11, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+12, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+13, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+14, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+15, row_index, accumulator);
         break;
     case 16:
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+2, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+3, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+4, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+5, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+6, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+7, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+8, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+9, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+10, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+11, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+12, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+13, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+14, row_index);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+15, row_index);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+8, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+9, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+10, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+11, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+12, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+13, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+14, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+15, row_index, accumulator);
         break;
     }
 }
