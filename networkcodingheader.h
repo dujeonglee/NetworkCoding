@@ -72,6 +72,7 @@ do\
 struct Ack
 {
     unsigned short int blk_seq;    /*2*/
+    unsigned char losses;             /*1*/
 }__attribute__((packed));
 
 #endif

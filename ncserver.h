@@ -65,6 +65,10 @@ private:
      */
     unsigned short int _blk_seq;
     /*
+     *
+     */
+    float _loss_rate;
+    /*
      * Lock
      */
     std::mutex _lock;

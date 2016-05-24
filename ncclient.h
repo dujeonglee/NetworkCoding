@@ -42,6 +42,7 @@ private:
     PktBuffer* _buffer;
     unsigned short int _blk_seq;
     DecodingBuffer* _decoding_matrix;
+    unsigned char _losses;
     std::function <void (unsigned char *, unsigned int length)> _receive_callback;
     std::mutex _lock;
 

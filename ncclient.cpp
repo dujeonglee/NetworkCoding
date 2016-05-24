@@ -211,6 +211,7 @@ void ncclient::_decode(unsigned char* pkt, int size)
     _buffer[innovative_index].delivered = false;
     memcpy(_buffer[innovative_index].buffer, pkt, GET_OUTER_SIZE(pkt));
     _rank++;
+    _losses++;
 }
 
 bool ncclient::_handle_remedy_packet(unsigned char *pkt, int size)
@@ -344,7 +345,7 @@ void ncclient::_receive_handler()
         /*
          * Random Packet Loss
          */
-        if(rand()%10 == 0)
+        if(rand()%5 == 0)
         {
             continue;
         }
@@ -356,8 +357,9 @@ void ncclient::_receive_handler()
          */
         if(blk_seq - _blk_seq == 1  || _blk_seq - blk_seq == 0xffff)
         {
-            _blk_seq = blk_seq;
             _rank = 0;
+            _blk_seq = blk_seq;
+            _losses = 0;
             for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
             {
                 _buffer[i].delivered = false;
@@ -382,6 +384,7 @@ void ncclient::_receive_handler()
         {
             Ack ack_pkt;
             ack_pkt.blk_seq = _blk_seq;
+            ack_pkt.losses = _losses;
             ret = sendto(_socket, (void*)&ack_pkt, sizeof(ack_pkt), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
             if(ret != sizeof(ack_pkt))
             {
@@ -754,6 +757,7 @@ bool ncclient::open_client(std::function<void (unsigned char *, unsigned int)> r
     _receive_callback = rx_handler;
     _rank = 0;
     _blk_seq = 0;
+    _losses = 0;
     _rx_thread_running = true;
     _rx_thread = std::thread([&](){this->_receive_handler();});
     _state = ncclient::OPEN;

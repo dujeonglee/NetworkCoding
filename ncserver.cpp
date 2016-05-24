@@ -112,6 +112,10 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
     if(invoke_retransmission)
     {
         bool ack = false;
+        for(unsigned char i = 0 ; i < (unsigned char)_loss_rate ; i++)
+        {
+            _send_remedy_pkt();
+        }
         while(ack == false)
         {
             Ack ack_pkt;
@@ -121,6 +125,7 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
                 if(ack_pkt.blk_seq == _blk_seq)
                 {
                     ack = true;
+                    _loss_rate = (_loss_rate + (float)ack_pkt.losses)/2.;
                 }
             }
             else
@@ -295,7 +300,7 @@ bool ncserver::open_server()
     _tx_cnt = 0;
     _largest_pkt_size = 0;
     _blk_seq = 0;
-
+    _loss_rate = 0.;
     _state = ncserver::OPEN;
     return true;
 }
