@@ -75,4 +75,12 @@ struct Ack
     unsigned char losses;             /*1*/
 }__attribute__((packed));
 
+enum BLOCK_SIZE: unsigned char
+{
+    SIZE2 = 0x1<<1,
+    SIZE4 = 0x1<<2,
+    SIZE8 = 0x1<<3,
+    SIZE16 = 0x1<<4
+};
+
 #endif

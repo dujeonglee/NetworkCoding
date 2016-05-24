@@ -5,7 +5,7 @@
 #include <netinet/ip.h>
 #include <unistd.h>
 #include <mutex>
-
+#include "networkcodingheader.h"
 
 class ncserver
 {
@@ -15,6 +15,7 @@ private:
         CLOSE = 0,
         OPEN
     };
+
     /*
      * Control channel address
      */
@@ -74,8 +75,8 @@ private:
     std::mutex _lock;
 
 public:
-    ncserver(unsigned int client_ip, unsigned short int port, unsigned char block_size, unsigned int timeout);
-    ncserver(unsigned short int svrport, unsigned int client_ip, unsigned short int cport, unsigned char block_size, unsigned int timeout);
+    ncserver(unsigned int client_ip, unsigned short int port, BLOCK_SIZE block_size, unsigned int timeout);
+    ncserver(unsigned short int svrport, unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout);
     ~ncserver();
 
 private:

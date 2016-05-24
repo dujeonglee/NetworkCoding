@@ -1,6 +1,5 @@
 #ifndef NCCLIENT_H_
 #define NCCLIENT_H_
-#include "networkcodingheader.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -8,6 +7,7 @@
 #include <functional>
 #include <thread>
 #include <mutex>
+#include "networkcodingheader.h"
 
 struct DecodingBuffer
 {
@@ -31,7 +31,7 @@ private:
         OPEN
     };
     const sockaddr_in _DATA_ADDR;
-    const unsigned char _MAX_BLOCK_SIZE;
+    const BLOCK_SIZE _MAX_BLOCK_SIZE;
 
     STATE _state;
     int _socket;
@@ -47,7 +47,7 @@ private:
     std::mutex _lock;
 
 public:
-    ncclient(unsigned short int port, unsigned char block_size);
+    ncclient(unsigned short int port, BLOCK_SIZE block_size);
     ~ncclient();
 
 private:

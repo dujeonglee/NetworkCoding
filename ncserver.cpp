@@ -1,5 +1,4 @@
 #include "ncserver.h"
-#include "networkcodingheader.h"
 #include "finite_field.h"
 #include <exception>
 #include <string.h>
@@ -8,7 +7,7 @@
 /*
  * Constructor: Initialize const values and set _state as CLOSE.
  */
-ncserver::ncserver(unsigned int client_ip, unsigned short int port, unsigned char max_block_size, unsigned int timeout):\
+ncserver::ncserver(unsigned int client_ip, unsigned short int port, BLOCK_SIZE max_block_size, unsigned int timeout):\
     _CTRL_ADDR(_build_addr(INADDR_ANY, port)),\
     _DATA_ADDR(_build_addr(client_ip, port)), \
     _MAX_BLOCK_SIZE(max_block_size),\
@@ -24,7 +23,7 @@ ncserver::ncserver(unsigned int client_ip, unsigned short int port, unsigned cha
     _blk_seq = 0;
 }
 
-ncserver::ncserver(unsigned short int svrport, unsigned int client_ip, unsigned short int cliport, unsigned char max_block_size, unsigned int timeout):\
+ncserver::ncserver(unsigned short int svrport, unsigned int client_ip, unsigned short int cliport, BLOCK_SIZE max_block_size, unsigned int timeout):\
     _CTRL_ADDR(_build_addr(INADDR_ANY, svrport)),\
     _DATA_ADDR(_build_addr(client_ip, cliport)), \
     _MAX_BLOCK_SIZE(max_block_size),\

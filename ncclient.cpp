@@ -48,7 +48,7 @@ output[position] = accumulator
 unsigned int ori = 0;
 unsigned int coding = 0;
 
-ncclient::ncclient(unsigned short int port, unsigned char block_size) : \
+ncclient::ncclient(unsigned short int port, BLOCK_SIZE block_size) : \
     _DATA_ADDR(_build_addr(INADDR_ANY, port)), _MAX_BLOCK_SIZE(block_size)
 {
     _state = ncclient::CLOSE;

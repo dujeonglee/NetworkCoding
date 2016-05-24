@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
 
         printf("%hu %hhu.%hhu.%hhu.%hhu %hu\n", serverport, ((unsigned char*)&clientip)[3], ((unsigned char*)&clientip)[2], ((unsigned char*)&clientip)[1], ((unsigned char*)&clientip)[0], clientport);
 
-        ncserver nc_server(serverport, clientip, clientport, 8, 10);
+        ncserver nc_server(serverport, clientip, clientport, SIZE8, 10);
         if(nc_server.open_server() == false)
         {
             exit(-1);
@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
         printf("start client\n");
         unsigned short int clientport;
         sscanf(argv[1], "%hu", &clientport);
-        ncclient nc_client(clientport, 8);
+        ncclient nc_client(clientport, SIZE8);
         if(nc_client.open_client(rx) == false)
         {
             exit(-1);
