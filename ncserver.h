@@ -28,6 +28,8 @@ private:
      */
     const unsigned char _MAX_BLOCK_SIZE;
 
+    const unsigned int _TIMEOUT;
+
     /*
      * State of network coding server. Either CLOSE or OPEN.
      */

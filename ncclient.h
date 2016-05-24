@@ -9,6 +9,19 @@
 #include <thread>
 #include <mutex>
 
+struct DecodingBuffer
+{
+    bool empty;
+    unsigned char* encode;
+    unsigned char* decode;
+};
+
+struct PktBuffer
+{
+    bool delivered;
+    unsigned char* buffer;
+};
+
 class ncclient
 {
 private:
@@ -26,9 +39,9 @@ private:
     bool _rx_thread_running;
     unsigned char _rx_buffer[1500];
     unsigned char _rank;
-    unsigned char _next_pkt_index;
-    unsigned char** _buffer;
+    PktBuffer* _buffer;
     unsigned short int _blk_seq;
+    DecodingBuffer* _decoding_matrix;
     std::function <void (unsigned char *, unsigned int length)> _receive_callback;
     std::mutex _lock;
 
@@ -45,9 +58,21 @@ private:
         ret.sin_port = htons(port);
         return ret;
     }
-    bool _inovative(unsigned char *pkt, int size);
-    void _decode();
+    bool _handle_original_packet(const unsigned char * const pkt, int size);
+    int _innovative(unsigned char* pkt);
+    void _decode(unsigned char *pkt, int size);
+    bool _handle_remedy_packet(unsigned char *pkt, int size);
     void _receive_handler();
+    void _unroll_decode_2(unsigned char *output, unsigned short position, unsigned char row_index);
+    void _unroll_decode_4(unsigned char *output, unsigned short position, unsigned char row_index);
+    void _unroll_decode_8(unsigned char *output, unsigned short position, unsigned char row_index);
+    void _unroll_decode_16(unsigned char *output, unsigned short position, unsigned char row_index);
+    void _unroll_decode_32(unsigned char *output, unsigned short position, unsigned char row_index);
+    void _unroll_decode_64(unsigned char *output, unsigned short position, unsigned char row_index);
+    void _unroll_decode_128(unsigned char *output, unsigned short position, unsigned char row_index);
+    void _unroll_decode_256(unsigned char *output, unsigned short position, unsigned char row_index);
+    void _unroll_decode_512(unsigned char *output, unsigned short position, unsigned char row_index);
+    void _unroll_decode_1024(unsigned char *output, unsigned short position, unsigned char row_index);
 public:
     unsigned short int recv(unsigned char* pkt, unsigned short int pkt_size);
     bool open_client(std::function <void (unsigned char *, unsigned int length)> rx_handler);

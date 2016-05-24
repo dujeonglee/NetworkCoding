@@ -6,7 +6,8 @@ INCLUDES :=
 OBJECTS  := $(SOURCES:.cpp=.o)
 LIBRARY := -lpthread
 CPP := g++
-TARGET = test
+#CPP := arm-linux-gnueabihf-g++
+TARGET = server
 
 all : debug
 
@@ -19,8 +20,11 @@ $(TARGET) : $(OBJECTS)
 clean :
 	rm -rf $(OBJECTS) $(TARGET) *~
 
-debug : CPPFLAGS := -g -pg -c -Wall -Werror -std=c++11 -fopenmp -DRANDOM_PKT_LOSS
+debug : CPPFLAGS := -g -pg -c -Wall -std=c++11 -fopenmp -DRANDOM_PKT_LOSS
 debug : $(TARGET)
+	cp $(TARGET) client
 
-release : CPPFLAGS := -O0 -c -Wall -Werror -std=c++11 -fopenmp
+release : CPPFLAGS := -O0 -c -Wall -std=c++11 -fopenmp
 release : $(TARGET)
+	cp $(TARGET) client
+

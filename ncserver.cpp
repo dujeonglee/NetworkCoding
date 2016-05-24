@@ -11,7 +11,8 @@
 ncserver::ncserver(unsigned int client_ip, unsigned short int port, unsigned char max_block_size, unsigned int timeout):\
     _CTRL_ADDR(_build_addr(INADDR_ANY, port)),\
     _DATA_ADDR(_build_addr(client_ip, port)), \
-    _MAX_BLOCK_SIZE(max_block_size)
+    _MAX_BLOCK_SIZE(max_block_size),\
+    _TIMEOUT(timeout)
 {
     _state = ncserver::CLOSE;
     _socket = -1;
@@ -26,7 +27,8 @@ ncserver::ncserver(unsigned int client_ip, unsigned short int port, unsigned cha
 ncserver::ncserver(unsigned short int svrport, unsigned int client_ip, unsigned short int cliport, unsigned char max_block_size, unsigned int timeout):\
     _CTRL_ADDR(_build_addr(INADDR_ANY, svrport)),\
     _DATA_ADDR(_build_addr(client_ip, cliport)), \
-    _MAX_BLOCK_SIZE(max_block_size)
+    _MAX_BLOCK_SIZE(max_block_size),\
+    _TIMEOUT(timeout)
 {
     _state = ncserver::CLOSE;
     _socket = -1;
@@ -75,8 +77,8 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
         _largest_pkt_size = pkt_size;
     }
     // Fill outer header
-    const unsigned char* pkt_buffer = _buffer[_tx_cnt++];
-    const bool invoke_retransmission = (_tx_cnt == _MAX_BLOCK_SIZE) || (complete_block == true);
+    const unsigned char* pkt_buffer = _buffer[_tx_cnt];
+    const bool invoke_retransmission = (_tx_cnt == _MAX_BLOCK_SIZE - 1) || (complete_block == true);
 
     GET_OUTER_BLK_SEQ(pkt_buffer) = _blk_seq;
     GET_OUTER_SIZE(pkt_buffer) = TOTAL_HEADER_SIZE(_MAX_BLOCK_SIZE)+pkt_size;
@@ -91,7 +93,7 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
     GET_INNER_SIZE(pkt_buffer) = pkt_size;
     GET_INNER_LAST_INDICATOR(pkt_buffer) = 1; // I will support pkt_size larger than MAX_PAYLOAD_SIZE in the next phase.
     memset(GET_INNER_CODE(pkt_buffer), 0x0, _MAX_BLOCK_SIZE);
-    GET_INNER_CODE(pkt_buffer)[_tx_cnt-1] = 1; // Array index is 0 base.
+    GET_INNER_CODE(pkt_buffer)[_tx_cnt] = 1; // Array index is 0 base.
 
     // Copy data into payload
     memcpy(GET_INNER_PAYLOAD(pkt_buffer, _MAX_BLOCK_SIZE), pkt, pkt_size);
@@ -133,6 +135,10 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
         _largest_pkt_size = 0;
         _tx_cnt = 0;
     }
+    else
+    {
+        _tx_cnt++;
+    }
     return ret;
 }
 
@@ -143,18 +149,13 @@ bool ncserver::_send_remedy_pkt()
 {
     if(_tx_cnt == 0)
     {
-        // No packets are  sent to the client, therefore, no need for remedy packets.
-        return false;
-    }
-    if(_tx_cnt == 1)
-    {
         return (int)GET_OUTER_SIZE(_buffer[0]) == sendto(_socket, _buffer[0], GET_OUTER_SIZE(_buffer[0]), 0, (sockaddr*)&_DATA_ADDR, sizeof(_DATA_ADDR));
     }
     memset(_remedy_pkt, 0x0, TOTAL_HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
     // Generate random cofficient.
     for(unsigned int code_id = 0 ; code_id < _MAX_BLOCK_SIZE ; code_id++)
     {
-        _rand_coef[code_id] = code_id < _tx_cnt?1+rand()%255:0;
+        _rand_coef[code_id] = code_id <= _tx_cnt?1+rand()%255:0;
     }
 
     // Fill-in header information
@@ -163,7 +164,7 @@ bool ncserver::_send_remedy_pkt()
     GET_OUTER_BLK_SIZE(_remedy_pkt) = _tx_cnt;
     GET_OUTER_FLAGS(_remedy_pkt) = OuterHeader::FLAGS_END_OF_BLK;
     // Encode packets.
-    for(unsigned int packet_id = 0 ; packet_id < _tx_cnt ; packet_id++)
+    for(unsigned int packet_id = 0 ; packet_id <= _tx_cnt ; packet_id++)
     {
         for(unsigned int coding_position = OUTER_HEADER_SIZE ;
             coding_position < GET_OUTER_SIZE(_buffer[packet_id])/*NOTE: 0^x = 0*/ ;
@@ -195,7 +196,7 @@ bool ncserver::open_server()
         _socket = -1;
         return false;
     }
-    const timeval tv = {0, 500};
+    const timeval tv = {_TIMEOUT/1000, _TIMEOUT%1000};
     if(setsockopt(_socket, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) == -1)
     {
         close(_socket);
