@@ -333,7 +333,7 @@ void ncclient::_receive_handler()
         /*
          * Random Packet Loss
          */
-        if(rand()%5 == 0)
+        if(rand()%10 == 0)
         {
             continue;
         }
@@ -343,7 +343,7 @@ void ncclient::_receive_handler()
          * A change on a block sequence number indicates start of new block.
          * We need to flush rx buffers.
          */
-        if(blk_seq - _blk_seq == 1  || _blk_seq - blk_seq == 0xffff)
+        if(blk_seq != _blk_seq)
         {
             _rank = 0;
             _blk_seq = blk_seq;

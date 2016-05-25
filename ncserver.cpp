@@ -1,8 +1,9 @@
-#include "ncserver.h"
-#include "finite_field.h"
-#include <exception>
 #include <string.h>
+#include <stdlib.h>
+#include <exception>
 #include <iostream>
+#include "finite_field.h"
+#include "ncserver.h"
 
 /*
  * Constructor: Initialize const values and set _state as CLOSE.
@@ -20,7 +21,7 @@ ncserver::ncserver(unsigned int client_ip, unsigned short int port, BLOCK_SIZE m
     _remedy_pkt = nullptr;
     _tx_cnt = 0;
     _largest_pkt_size = 0;
-    _blk_seq = 0;
+    _blk_seq = rand();
 }
 
 ncserver::ncserver(unsigned short int svrport, unsigned int client_ip, unsigned short int cliport, BLOCK_SIZE max_block_size, unsigned int timeout):\
@@ -36,7 +37,7 @@ ncserver::ncserver(unsigned short int svrport, unsigned int client_ip, unsigned 
     _remedy_pkt = nullptr;;
     _tx_cnt = 0;
     _largest_pkt_size = 0;
-    _blk_seq = 0;
+    _blk_seq = rand();
 }
 
 /*
@@ -111,7 +112,7 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
     if(invoke_retransmission)
     {
         bool ack = false;
-        for(unsigned char i = 0 ; i < (unsigned char)_loss_rate ; i++)
+        for(unsigned char i = 0 ; i < (unsigned char)_loss_rate+1 ; i++)
         {
             _send_remedy_pkt();
         }
@@ -135,7 +136,12 @@ unsigned short int ncserver::send(unsigned char* pkt, unsigned short int pkt_siz
                 }
             }
         }
-        _blk_seq++;
+        unsigned short next_blk_seq;
+        do
+        {
+            next_blk_seq = rand();
+        }while(next_blk_seq == _blk_seq);
+        _blk_seq = next_blk_seq;
         _largest_pkt_size = 0;
         _tx_cnt = 0;
     }
