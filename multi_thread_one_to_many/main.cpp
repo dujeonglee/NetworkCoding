@@ -39,9 +39,7 @@ int main(int argc, char* argv[])
         sscanf(argv[3], "%hu", &clientport);
         std::atomic<unsigned char> finished;
         finished = 0;
-
         ncserver nc_server(serverport, 10);
-
          send_thread_1 = std::thread([&](){
              if(nc_server.open_session(clientip, clientport, BLOCK_SIZE::SIZE8) == false)
              {
@@ -65,13 +63,13 @@ int main(int argc, char* argv[])
              finished++;
          });
          send_thread_1.detach();
+
+         ncserver nc_server2(serverport+1, 10);
          send_thread_2 = std::thread([&](){
-             /*
-             if(nc_server.open_session(clientip, clientport+1, BLOCK_SIZE::SIZE8) == false)
+             if(nc_server2.open_session(clientip, clientport, BLOCK_SIZE::SIZE4) == false)
              {
                  exit(-1);
              }
-             */
              unsigned char data[1000] = {0,};
              unsigned int bytes_sent = 0;
              unsigned char data_seq = 0;
@@ -80,12 +78,12 @@ int main(int argc, char* argv[])
                  data[0] = data_seq++;
                  data[1] = rand()%256;
                  data[2] = data[0] ^ data[1];
-                 bytes_sent+=(unsigned int)nc_server.send(clientip, clientport, data, 1000, false);
+                 bytes_sent+=(unsigned int)nc_server2.send(clientip, clientport, data, 1000, false);
              }
              data[0] = data_seq++;
              data[1] = rand()%256;
              data[2] = data[0] ^ data[1];
-             bytes_sent+=(unsigned int)nc_server.send(clientip, clientport, data, 1000, true);
+             bytes_sent+=(unsigned int)nc_server2.send(clientip, clientport, data, 1000, true);
              printf("Complete\n");
              finished++;
          });
@@ -97,11 +95,7 @@ int main(int argc, char* argv[])
         printf("start client\n");
         unsigned short int clientport;
         sscanf(argv[1], "%hu", &clientport);
-        ncclient nc_client(clientport, SIZE8);
-        if(nc_client.open_client(rx) == false)
-        {
-            exit(-1);
-        }
+        ncclient nc_client(clientport, rx);
         while(bytes_received < 200000000);
         sleep(1);
         printf("Complete\n");

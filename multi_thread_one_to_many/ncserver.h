@@ -3,24 +3,23 @@
 /*=========== C Header ===========*/
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 /*========== C++ Header ==========*/
 #include <atomic>
+#include <exception>
+#include <iostream>
 #include <mutex>
 #include <thread>
 /*========= Project Header =========*/
 #include "avltree.h"
+#include "finite_field.h"
 #include "networkcodingheader.h"
 
-// Key of tx_session_info for avltree
-struct tx_session_info_key{
-    unsigned int ip;
-    unsigned short port;
-}__attribute__((packed));
-
 // Client session information
-class tx_session_info
+class client_session_info
 {
     friend class ncserver;
 private:
@@ -93,11 +92,11 @@ private:
      * @param cport: Client's port number (host byte order)
      * @param block_size: Maximum block size.
      */
-    tx_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size);
+    client_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size);
     /**
      * @brief ~tx_session_info: Destructor of client session information
      */
-    ~tx_session_info();
+    ~client_session_info();
 };
 
 
@@ -132,7 +131,7 @@ private:
     /**
      * @brief _tx_session_info: Hash table data structure maintaining a list of clients. (thread-safe)
      */
-    avltree<tx_session_info_key, tx_session_info*> _tx_session_info;
+    avltree<ip_port_key, client_session_info*> _tx_session_info;
     /**
      * @brief _ack_reception_thread_running: Indicate if "_ack_reception_thread" is running.
      */
@@ -149,7 +148,7 @@ private:
      * @param info: Client's tx_session_info for retransmission
      * @return: On success true. Otherwise, false.
      */
-    bool _send_remedy_pkt(tx_session_info* const info);
+    bool _send_remedy_pkt(client_session_info* const info);
 
 public:
     /**

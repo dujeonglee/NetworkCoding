@@ -1,130 +1,193 @@
 #include "ncclient.h"
-#include "finite_field.h"
-#include <string.h>
-#include <iostream>
 
-#define UNROLL_MATRIX_MULTIPLICATION_2(output, position, row_index, accumulator) \
-accumulator = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
+extern sockaddr_in addr(unsigned int ip, unsigned short int port);
+
+#define UNROLL_MATRIX_MULTIPLICATION_2(session, output, position, row_index, accumulator) \
+accumulator   = FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[0], session->_buffer[0].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[1], session->_buffer[1].pkt.buffer[position]),\
 output[position] = accumulator
 
-#define UNROLL_MATRIX_MULTIPLICATION_4(output, position, row_index, accumulator) \
-accumulator = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[2], _buffer[2].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[3], _buffer[3].buffer[position]);\
+#define UNROLL_MATRIX_MULTIPLICATION_4(session, output, position, row_index, accumulator) \
+accumulator   = FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[0], session->_buffer[0].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[1], session->_buffer[1].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[2], session->_buffer[2].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[3], session->_buffer[3].pkt.buffer[position]),\
 output[position] = accumulator
 
-#define UNROLL_MATRIX_MULTIPLICATION_8(output, position, row_index, accumulator) \
-accumulator = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[2], _buffer[2].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[3], _buffer[3].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[4], _buffer[4].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[5], _buffer[5].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[6], _buffer[6].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[7], _buffer[7].buffer[position]);\
+#define UNROLL_MATRIX_MULTIPLICATION_8(session, output, position, row_index, accumulator) \
+accumulator   = FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[0], session->_buffer[0].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[1], session->_buffer[1].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[2], session->_buffer[2].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[3], session->_buffer[3].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[4], session->_buffer[4].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[5], session->_buffer[5].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[6], session->_buffer[6].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[7], session->_buffer[7].pkt.buffer[position]),\
 output[position] = accumulator
 
-#define UNROLL_MATRIX_MULTIPLICATION_16(output, position, row_index, accumulator) \
-accumulator = FiniteField::instance()->mul(_decoding_matrix[row_index].decode[0], _buffer[0].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[1], _buffer[1].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[2], _buffer[2].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[3], _buffer[3].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[4], _buffer[4].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[5], _buffer[5].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[6], _buffer[6].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[7], _buffer[7].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[8], _buffer[8].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[9], _buffer[9].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[10], _buffer[10].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[11], _buffer[11].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[12], _buffer[12].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[13], _buffer[13].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[14], _buffer[14].buffer[position]);\
-accumulator ^= FiniteField::instance()->mul(_decoding_matrix[row_index].decode[15], _buffer[15].buffer[position]);\
+#define UNROLL_MATRIX_MULTIPLICATION_16(session, output, position, row_index, accumulator) \
+accumulator   = FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[0], session->_buffer[0].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[1], session->_buffer[1].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[2], session->_buffer[2].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[3], session->_buffer[3].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[4], session->_buffer[4].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[5], session->_buffer[5].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[6], session->_buffer[6].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[7], session->_buffer[7].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[8], session->_buffer[8].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[9], session->_buffer[9].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[10], session->_buffer[10].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[11], session->_buffer[11].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[12], session->_buffer[12].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[13], session->_buffer[13].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[14], session->_buffer[14].pkt.buffer[position]),\
+accumulator ^= FiniteField::instance()->mul(session->_decoding_matrix[row_index].decode[15], session->_buffer[15].pkt.buffer[position]),\
 output[position] = accumulator
 
-unsigned int ori = 0;
-unsigned int coding = 0;
-
-ncclient::ncclient(unsigned short int port, BLOCK_SIZE block_size) : \
-    _DATA_ADDR(_build_addr(INADDR_ANY, port)), _MAX_BLOCK_SIZE(block_size)
+server_session_info::server_session_info(unsigned char blk_size): _MAX_BLOCK_SIZE(blk_size)
 {
-    _state = ncclient::CLOSE;
+    _state = server_session_info::STATE::INIT_FAILURE;
+    _rank = 0;
+    try
+    {
+        _buffer = new PktBuffer[_MAX_BLOCK_SIZE];
+    }
+    catch(std::exception ex)
+    {
+        return;
+    }
+    _blk_seq = 0;
+    try
+    {
+        _decoding_matrix = new DecodingBuffer[_MAX_BLOCK_SIZE];
+        for(unsigned char index = 0 ; index < _MAX_BLOCK_SIZE ; index++)
+        {
+            _decoding_matrix[index].empty = true;
+            _decoding_matrix[index].encode = nullptr;
+            _decoding_matrix[index].decode = nullptr;
+        }
+    }
+    catch(std::exception &ex)
+    {
+        delete [] _buffer;
+        _buffer = nullptr;
+        return;
+    }
+    try
+    {
+        for(unsigned char index = 0 ; index < _MAX_BLOCK_SIZE ; index++)
+        {
+            _decoding_matrix[index].encode = new unsigned char[_MAX_BLOCK_SIZE];
+            _decoding_matrix[index].decode = new unsigned char[_MAX_BLOCK_SIZE];
+        }
+    }
+    catch(std::exception ex)
+    {
+        for(unsigned char index = 0 ; index < _MAX_BLOCK_SIZE ; index++)
+        {
+            if(_decoding_matrix[index].encode != nullptr)
+            {
+                delete [] _decoding_matrix[index].encode;
+            }
+            if(_decoding_matrix[index].decode != nullptr)
+            {
+                delete [] _decoding_matrix[index].decode;
+            }
+        }
+        delete [] _decoding_matrix;
+        _decoding_matrix = nullptr;
+        delete [] _buffer;
+        _buffer = nullptr;
+    }
+    _losses = 0;
+    _state = server_session_info::STATE::INIT_SUCCESS;
 }
 
-ncclient::~ncclient()
+server_session_info::~server_session_info()
 {
-    printf("Coding %u Orig %u\n", coding, ori);
-    close_client();
+    if(_state == server_session_info::STATE::INIT_FAILURE)
+    {
+        return;
+    }
+    for(unsigned char index = 0 ; index < _MAX_BLOCK_SIZE ; index++)
+    {
+        if(_decoding_matrix[index].encode != nullptr)
+        {
+            delete [] _decoding_matrix[index].encode;
+        }
+        if(_decoding_matrix[index].decode != nullptr)
+        {
+            delete [] _decoding_matrix[index].decode;
+        }
+    }
+    delete [] _decoding_matrix;
+    _decoding_matrix = nullptr;
+    delete [] _buffer;
+    _buffer = nullptr;
 }
 
-bool ncclient::_handle_original_packet(const unsigned char * const pkt, int size)
+bool ncclient::_handle_original_packet(server_session_info* const session_info, const unsigned char * const pkt, int size)
 {
     // Copy original packet to the relavant position in _buffer.
     // For original pkt, GET_OUTER_BLK_SIZE(pkt) is _tx_cnt.
+
     const unsigned short int index = GET_OUTER_BLK_SIZE(pkt);
-    _buffer[index].delivered = false;
-    memcpy(_buffer[index].buffer, pkt, GET_OUTER_SIZE(pkt));
-    _decoding_matrix[index].empty = false;
-    memcpy(_decoding_matrix[index].encode, GET_INNER_CODE(pkt), _MAX_BLOCK_SIZE);
-    memcpy(_decoding_matrix[index].decode, GET_INNER_CODE(pkt), _MAX_BLOCK_SIZE);
+    session_info->_buffer[index].delivered = false;
+    memcpy(session_info->_buffer[index].pkt.buffer, pkt, GET_OUTER_SIZE(pkt));
+    session_info->_decoding_matrix[index].empty = false;
+    memcpy(session_info->_decoding_matrix[index].encode, GET_INNER_CODE(pkt), session_info->_MAX_BLOCK_SIZE);
+    memcpy(session_info->_decoding_matrix[index].decode, GET_INNER_CODE(pkt), session_info->_MAX_BLOCK_SIZE);
 
     bool send_ack = false;
-    if(_rank == GET_OUTER_BLK_SIZE(pkt))
+    if(session_info->_rank == GET_OUTER_BLK_SIZE(pkt))
     {
-        _lock.lock();
         if(_receive_callback != nullptr)
         {
-            ori++;
-            _receive_callback(GET_INNER_PAYLOAD(_buffer[index].buffer, _MAX_BLOCK_SIZE), GET_INNER_SIZE(_buffer[index].buffer));
-            _buffer[index].delivered = true; // The packet is delivered.
+            _receive_callback(GET_INNER_PAYLOAD(session_info->_buffer[index].pkt.buffer, session_info->_MAX_BLOCK_SIZE), GET_INNER_SIZE(session_info->_buffer[index].pkt.buffer));
+            session_info->_buffer[index].delivered = true; // The packet is delivered.
         }
-        _lock.unlock();
-
         // All original packets in the block are received without losses.
         // Send the ack.
-        if(GET_OUTER_FLAGS(_buffer[index].buffer) & OuterHeader::FLAGS_END_OF_BLK)
+        if(GET_OUTER_FLAGS(session_info->_buffer[index].pkt.buffer) & OuterHeader::FLAGS_END_OF_BLK)
         {
             send_ack = true;
         }
     }
     if(send_ack == false)
     {
-        _rank++;
+        session_info->_rank++;
     }
     return send_ack;
 }
 
-int ncclient::_innovative(unsigned char* pkt)
+int ncclient::_innovative(server_session_info * const session_info, unsigned char* pkt)
 {
     // 1. find an empty slot.
     int innovative_index = 0;
-    for( ; innovative_index < _MAX_BLOCK_SIZE ; innovative_index++)
+    for( ; innovative_index < session_info->_MAX_BLOCK_SIZE ; innovative_index++)
     {
-        if(_decoding_matrix[innovative_index].empty == true)
+        if(session_info->_decoding_matrix[innovative_index].empty == true)
         {
-            _decoding_matrix[innovative_index].empty = false;
-            memcpy(_decoding_matrix[innovative_index].encode, GET_INNER_CODE(pkt), _MAX_BLOCK_SIZE);
-            memset(_decoding_matrix[innovative_index].decode, 0x0, _MAX_BLOCK_SIZE);
-            _decoding_matrix[innovative_index].decode[innovative_index] = 1;
+            session_info->_decoding_matrix[innovative_index].empty = false;
+            memcpy(session_info->_decoding_matrix[innovative_index].encode, GET_INNER_CODE(pkt), session_info->_MAX_BLOCK_SIZE);
+            memset(session_info->_decoding_matrix[innovative_index].decode, 0x0, session_info->_MAX_BLOCK_SIZE);
+            session_info->_decoding_matrix[innovative_index].decode[innovative_index] = 1;
             break;
         }
     }
-    if(innovative_index >= _MAX_BLOCK_SIZE)
+    if(innovative_index >= session_info->_MAX_BLOCK_SIZE)
     {
         return -1;
     }
 
     // 2. eliminate redundunt information of pkt
-    for(unsigned char buffer_index = 0 ; buffer_index < _MAX_BLOCK_SIZE ; buffer_index++)
+    for(unsigned char buffer_index = 0 ; buffer_index < session_info->_MAX_BLOCK_SIZE ; buffer_index++)
     {
-        if(_decoding_matrix[buffer_index].empty == true)
+        if(session_info->_decoding_matrix[buffer_index].empty == true)
         {
             continue;
         }
-        if(_decoding_matrix[innovative_index].encode[buffer_index] == 0)
+        if(session_info->_decoding_matrix[innovative_index].encode[buffer_index] == 0)
         {
             continue;
         }
@@ -132,42 +195,42 @@ int ncclient::_innovative(unsigned char* pkt)
         {
             continue;
         }
-        const unsigned char mul = _decoding_matrix[innovative_index].encode[buffer_index];
-        for(unsigned char code_index = 0 ; code_index < _MAX_BLOCK_SIZE ; code_index++)
+        const unsigned char mul = session_info->_decoding_matrix[innovative_index].encode[buffer_index];
+        for(unsigned char code_index = 0 ; code_index < session_info->_MAX_BLOCK_SIZE ; code_index++)
         {
-            _decoding_matrix[innovative_index].encode[code_index] = FiniteField::instance()->mul(_decoding_matrix[buffer_index].encode[code_index], mul) ^ _decoding_matrix[innovative_index].encode[code_index];
-            _decoding_matrix[innovative_index].decode[code_index] = FiniteField::instance()->mul(_decoding_matrix[buffer_index].decode[code_index], mul) ^ _decoding_matrix[innovative_index].decode[code_index];
+            session_info->_decoding_matrix[innovative_index].encode[code_index] = FiniteField::instance()->mul(session_info->_decoding_matrix[buffer_index].encode[code_index], mul) ^ session_info->_decoding_matrix[innovative_index].encode[code_index];
+            session_info->_decoding_matrix[innovative_index].decode[code_index] = FiniteField::instance()->mul(session_info->_decoding_matrix[buffer_index].decode[code_index], mul) ^ session_info->_decoding_matrix[innovative_index].decode[code_index];
         }
     }
 
     // 3. check innovativity
-    if(_decoding_matrix[innovative_index].encode[innovative_index] == 0)
+    if(session_info->_decoding_matrix[innovative_index].encode[innovative_index] == 0)
     {
-        _decoding_matrix[innovative_index].empty = true;
-        memset(_decoding_matrix[innovative_index].encode, 0x0, _MAX_BLOCK_SIZE);
-        memset(_decoding_matrix[innovative_index].decode, 0x0, _MAX_BLOCK_SIZE);
+        session_info->_decoding_matrix[innovative_index].empty = true;
+        memset(session_info->_decoding_matrix[innovative_index].encode, 0x0, session_info->_MAX_BLOCK_SIZE);
+        memset(session_info->_decoding_matrix[innovative_index].decode, 0x0, session_info->_MAX_BLOCK_SIZE);
         return -1;
     }
 
     // 4. Make _decoding_matrix[innovative_index].encode[innovative_index] to be 1.
-    if(_decoding_matrix[innovative_index].encode[innovative_index] != 1)
+    if(session_info->_decoding_matrix[innovative_index].encode[innovative_index] != 1)
     {
-        const unsigned char mul = FiniteField::instance()->inv(_decoding_matrix[innovative_index].encode[innovative_index]);
-        for(unsigned char code_index = 0 ; code_index < _MAX_BLOCK_SIZE ; code_index++)
+        const unsigned char mul = FiniteField::instance()->inv(session_info->_decoding_matrix[innovative_index].encode[innovative_index]);
+        for(unsigned char code_index = 0 ; code_index < session_info->_MAX_BLOCK_SIZE ; code_index++)
         {
-            _decoding_matrix[innovative_index].encode[code_index] = FiniteField::instance()->mul(_decoding_matrix[innovative_index].encode[code_index], mul);
-            _decoding_matrix[innovative_index].decode[code_index] = FiniteField::instance()->mul(_decoding_matrix[innovative_index].decode[code_index], mul);
+            session_info->_decoding_matrix[innovative_index].encode[code_index] = FiniteField::instance()->mul(session_info->_decoding_matrix[innovative_index].encode[code_index], mul);
+            session_info->_decoding_matrix[innovative_index].decode[code_index] = FiniteField::instance()->mul(session_info->_decoding_matrix[innovative_index].decode[code_index], mul);
         }
     }
 
     // 5. remove redundunt information from the buffer
-    for(unsigned char buffer_index = 0 ; buffer_index < _MAX_BLOCK_SIZE ; buffer_index++)
+    for(unsigned char buffer_index = 0 ; buffer_index < session_info->_MAX_BLOCK_SIZE ; buffer_index++)
     {
-        if(_decoding_matrix[buffer_index].empty == true)
+        if(session_info->_decoding_matrix[buffer_index].empty == true)
         {
             continue;
         }
-        if(_decoding_matrix[buffer_index].encode[innovative_index] == 0)
+        if(session_info->_decoding_matrix[buffer_index].encode[innovative_index] == 0)
         {
             continue;
         }
@@ -175,141 +238,135 @@ int ncclient::_innovative(unsigned char* pkt)
         {
             continue;
         }
-        const unsigned char mul = _decoding_matrix[buffer_index].encode[innovative_index];
-        for(unsigned char code_index = 0 ; code_index < _MAX_BLOCK_SIZE ; code_index++)
+        const unsigned char mul = session_info->_decoding_matrix[buffer_index].encode[innovative_index];
+        for(unsigned char code_index = 0 ; code_index < session_info->_MAX_BLOCK_SIZE ; code_index++)
         {
-            _decoding_matrix[buffer_index].encode[code_index] = FiniteField::instance()->mul( _decoding_matrix[innovative_index].encode[code_index], mul ) ^ \
-                    _decoding_matrix[buffer_index].encode[code_index];
-            _decoding_matrix[buffer_index].decode[code_index] = FiniteField::instance()->mul( _decoding_matrix[innovative_index].decode[code_index], mul ) ^ \
-                    _decoding_matrix[buffer_index].decode[code_index];
+            session_info->_decoding_matrix[buffer_index].encode[code_index] = FiniteField::instance()->mul( session_info->_decoding_matrix[innovative_index].encode[code_index], mul ) ^ \
+                    session_info->_decoding_matrix[buffer_index].encode[code_index];
+            session_info->_decoding_matrix[buffer_index].decode[code_index] = FiniteField::instance()->mul( session_info->_decoding_matrix[innovative_index].decode[code_index], mul ) ^ \
+                    session_info->_decoding_matrix[buffer_index].decode[code_index];
         }
     }
 
     return innovative_index;
 }
 
-void ncclient::_decode(unsigned char* pkt, int size)
+void ncclient::_decode(server_session_info * const session_info, unsigned char* pkt, int size)
 {
-    int innovative_index = _innovative(pkt);
+    int innovative_index = _innovative(session_info, pkt);
     if(innovative_index == -1)
     {
         return;
     }
-    _buffer[innovative_index].delivered = false;
-    memcpy(_buffer[innovative_index].buffer, pkt, GET_OUTER_SIZE(pkt));
-    _rank++;
-    _losses++;
+    session_info->_buffer[innovative_index].delivered = false;
+    memcpy(session_info->_buffer[innovative_index].pkt.buffer, pkt, GET_OUTER_SIZE(pkt));
+    session_info->_rank++;
+    session_info->_losses++;
 }
 
-bool ncclient::_handle_remedy_packet(unsigned char *pkt, int size)
+bool ncclient::_handle_remedy_packet(server_session_info* const session_info, unsigned char *pkt, int size)
 {
-    if(_rank == GET_OUTER_BLK_SIZE(pkt)+1)
+    if(session_info->_rank == GET_OUTER_BLK_SIZE(pkt)+1)
     {
         return true;
     }
-    _decode(pkt, size);
-    if(_rank == GET_OUTER_BLK_SIZE(pkt)+1)
+    _decode(session_info, pkt, size);
+    if(session_info->_rank == GET_OUTER_BLK_SIZE(pkt)+1)
     {
-        for(unsigned char i = 0 ; i < _rank ; i++)
+        for(unsigned char i = 0 ; i < session_info->_rank ; i++)
         {
-            if(_buffer[i].delivered == false)
+            if(session_info->_buffer[i].delivered == false)
             {
-                if((GET_OUTER_FLAGS(_buffer[i].buffer) & OuterHeader::FLAGS_ORIGINAL) == 0)
+                if((GET_OUTER_FLAGS(session_info->_buffer[i].pkt.buffer) & OuterHeader::FLAGS_ORIGINAL) == 0)
                 {
-                    memcpy(_rx_buffer, _buffer[i].buffer, OUTER_HEADER_SIZE);
+                    memcpy(_rx_buffer, session_info->_buffer[i].pkt.buffer, OUTER_HEADER_SIZE);
                     // decoding
-                    for(unsigned int decoding_position = OUTER_HEADER_SIZE ; decoding_position < GET_OUTER_SIZE(_buffer[i].buffer) ; )
+                    for(unsigned int decoding_position = OUTER_HEADER_SIZE ; decoding_position < GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) ; )
                     {
-                        if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 1023)
+                        if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 1023)
                         {
-                            _unroll_decode_1024(_rx_buffer, decoding_position, i);
+                            _unroll_decode_1024(session_info, _rx_buffer, decoding_position, i);
                             decoding_position+=1024;
                         }
-                        else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 511)
+                        else if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 511)
                         {
-                            _unroll_decode_512(_rx_buffer, decoding_position, i);
+                            _unroll_decode_512(session_info, _rx_buffer, decoding_position, i);
                             decoding_position+=512;
                         }
-                        else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 255)
+                        else if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 255)
                         {
-                            _unroll_decode_256(_rx_buffer, decoding_position, i);
+                            _unroll_decode_256(session_info, _rx_buffer, decoding_position, i);
                             decoding_position+=256;
                         }
-                        else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 127)
+                        else if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 127)
                         {
-                            _unroll_decode_128(_rx_buffer, decoding_position, i);
+                            _unroll_decode_128(session_info, _rx_buffer, decoding_position, i);
                             decoding_position+=128;
                         }
-                        else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 63)
+                        else if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 63)
                         {
-                            _unroll_decode_64(_rx_buffer, decoding_position, i);
+                            _unroll_decode_64(session_info, _rx_buffer, decoding_position, i);
                             decoding_position+=64;
                         }
-                        else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 31)
+                        else if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 31)
                         {
-                            _unroll_decode_32(_rx_buffer, decoding_position, i);
+                            _unroll_decode_32(session_info, _rx_buffer, decoding_position, i);
                             decoding_position+=32;
                         }
-                        else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 15)
+                        else if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 15)
                         {
-                            _unroll_decode_16(_rx_buffer, decoding_position, i);
+                            _unroll_decode_16(session_info, _rx_buffer, decoding_position, i);
                             decoding_position+=16;
                         }
-                        else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 7)
+                        else if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 7)
                         {
-                            _unroll_decode_8(_rx_buffer, decoding_position, i);
+                            _unroll_decode_8(session_info, _rx_buffer, decoding_position, i);
                             decoding_position+=8;
                         }
-                        else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 3)
+                        else if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 3)
                         {
-                            _unroll_decode_4(_rx_buffer, decoding_position, i);
+                            _unroll_decode_4(session_info, _rx_buffer, decoding_position, i);
                             decoding_position+=4;
                         }
-                        else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 1)
+                        else if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 1)
                         {
-                            _unroll_decode_2(_rx_buffer, decoding_position, i);
+                            _unroll_decode_2(session_info, _rx_buffer, decoding_position, i);
                             decoding_position+=2;
                         }
-                        else if(GET_OUTER_SIZE(_buffer[i].buffer) - decoding_position > 0)
+                        else if(GET_OUTER_SIZE(session_info->_buffer[i].pkt.buffer) - decoding_position > 0)
                         {
                             unsigned char accumulator;
-                            switch(_MAX_BLOCK_SIZE)
+                            switch(session_info->_MAX_BLOCK_SIZE)
                             {
                             case 2:
-                                UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, decoding_position, i, accumulator);
+                                UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, decoding_position, i, accumulator);
                                 break;
                             case 4:
-                                UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, decoding_position, i, accumulator);
+                                UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, decoding_position, i, accumulator);
                                 break;
                             case 8:
-                                UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, decoding_position, i, accumulator);
+                                UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, decoding_position, i, accumulator);
                                 break;
                             case 16:
-                                UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, decoding_position, i, accumulator);
+                                UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, decoding_position, i, accumulator);
                                 break;
                             }
                             decoding_position+=1;
                         }
                     }
-                    _lock.lock();
                     if(_receive_callback != nullptr)
                     {
-                        coding++;
-                        _receive_callback(GET_INNER_PAYLOAD(_rx_buffer, _MAX_BLOCK_SIZE), GET_INNER_SIZE(_rx_buffer));
-                        _buffer[i].delivered = true; // The packet is delivered.
+                        _receive_callback(GET_INNER_PAYLOAD(_rx_buffer, session_info->_MAX_BLOCK_SIZE), GET_INNER_SIZE(_rx_buffer));
+                        session_info->_buffer[i].delivered = true; // The packet is delivered.
                     }
-                    _lock.unlock();
                 }
                 else
                 {
-                    _lock.lock();
                     if(_receive_callback != nullptr)
                     {
-                        ori++;
-                        _receive_callback(GET_INNER_PAYLOAD(_buffer[i].buffer, _MAX_BLOCK_SIZE), GET_INNER_SIZE(_buffer[i].buffer));
-                        _buffer[i].delivered = true; // The packet is delivered.
+                        _receive_callback(GET_INNER_PAYLOAD(session_info->_buffer[i].pkt.buffer, session_info->_MAX_BLOCK_SIZE), GET_INNER_SIZE(session_info->_buffer[i].pkt.buffer));
+                        session_info->_buffer[i].delivered = true; // The packet is delivered.
                     }
-                    _lock.unlock();
                 }
             }
         }
@@ -338,297 +395,309 @@ void ncclient::_receive_handler()
             continue;
         }
 
+        const ip_port_key key = {svr_addr.sin_addr.s_addr, svr_addr.sin_port};
+        server_session_info** const lookup_result = _server_session_info.find(key);
+        server_session_info* session_info = nullptr;
+        if(lookup_result == nullptr)
+        {
+            session_info = new server_session_info(GET_OUTER_MAX_BLK_SIZE(_rx_buffer));
+            _server_session_info.insert(key, session_info);
+        }
+        else
+        {
+            session_info = (*lookup_result);
+        }
+        if(session_info->_state == server_session_info::STATE::INIT_FAILURE){
+            continue;
+        }
         const unsigned short int blk_seq = GET_OUTER_BLK_SEQ(_rx_buffer);
+        session_info->_lock.lock();
         /*
          * A change on a block sequence number indicates start of new block.
          * We need to flush rx buffers.
          */
-        if(blk_seq != _blk_seq)
+        if(session_info->_blk_seq != blk_seq)
         {
             //printf("=======New Block=======\n");
-            _rank = 0;
-            _blk_seq = blk_seq;
-            _losses = 0;
-            for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+            session_info->_rank = 0;
+            session_info->_blk_seq = blk_seq;
+            session_info->_losses = 0;
+            for(int i = 0 ; i < session_info->_MAX_BLOCK_SIZE ; i++)
             {
-                _buffer[i].delivered = false;
-                memset(_buffer[i].buffer, 0x0, TOTAL_HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
-                _decoding_matrix[i].empty = true;
-                memset(_decoding_matrix[i].encode, 0x0, _MAX_BLOCK_SIZE);
-                memset(_decoding_matrix[i].decode, 0x0, _MAX_BLOCK_SIZE);
-                _decoding_matrix[i].decode[i] = 1;
+                session_info->_buffer[i].delivered = false;
+                memset(session_info->_buffer[i].pkt.buffer, 0x0, TOTAL_HEADER_SIZE(session_info->_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(session_info->_MAX_BLOCK_SIZE));
+                session_info->_decoding_matrix[i].empty = true;
+                memset(session_info->_decoding_matrix[i].encode, 0x0, session_info->_MAX_BLOCK_SIZE);
+                memset(session_info->_decoding_matrix[i].decode, 0x0, session_info->_MAX_BLOCK_SIZE);
+                session_info->_decoding_matrix[i].decode[i] = 1;
             }
         }
-
         bool send_ack = false;
         if(GET_OUTER_FLAGS(_rx_buffer) & OuterHeader::FLAGS_ORIGINAL)
         {
-            send_ack = _handle_original_packet(_rx_buffer, ret);
+            send_ack = _handle_original_packet(session_info, _rx_buffer, ret);
         }
         else
         {
-            send_ack = _handle_remedy_packet(_rx_buffer, ret);
+            send_ack = _handle_remedy_packet(session_info, _rx_buffer, ret);
         }
         if(send_ack)
         {
             Ack ack_pkt;
-            ack_pkt.blk_seq = _blk_seq;
-            ack_pkt.losses = _losses;
+            ack_pkt.blk_seq = session_info->_blk_seq;
+            ack_pkt.losses = session_info->_losses;
             ret = sendto(_socket, (void*)&ack_pkt, sizeof(ack_pkt), 0, (sockaddr*)&svr_addr, sizeof(svr_addr));
             if(ret != sizeof(ack_pkt))
             {
                 std::cout<<"Could not send ack\n";
             }
         }
+        session_info->_lock.unlock();
     }
 }
 
 
-void ncclient::_unroll_decode_2(unsigned char *output, unsigned short position, unsigned char row_index)
+void ncclient::_unroll_decode_2(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index)
 {
     unsigned char accumulator;
-    switch(_MAX_BLOCK_SIZE)
+    switch(session_info->_MAX_BLOCK_SIZE)
     {
     case 2:
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+1, row_index, accumulator);
         break;
     case 4:
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+1, row_index, accumulator);
         break;
     case 8:
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+1, row_index, accumulator);
         break;
     case 16:
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+1, row_index, accumulator);
         break;
     }
 }
 
-void ncclient::_unroll_decode_4(unsigned char *output, unsigned short position, unsigned char row_index)
+void ncclient::_unroll_decode_4(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index)
 {
     unsigned char accumulator;
-    switch(_MAX_BLOCK_SIZE)
+    switch(session_info->_MAX_BLOCK_SIZE)
     {
     case 2:
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+3, row_index, accumulator);
         break;
     case 4:
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+3, row_index, accumulator);
         break;
     case 8:
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+3, row_index, accumulator);
         break;
     case 16:
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+3, row_index, accumulator);
         break;
     }
 }
 
-void ncclient::_unroll_decode_8(unsigned char *output, unsigned short position, unsigned char row_index)
+void ncclient::_unroll_decode_8(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index)
 {
     unsigned char accumulator;
-    switch(_MAX_BLOCK_SIZE)
+    switch(session_info->_MAX_BLOCK_SIZE)
     {
     case 2:
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+3, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+4, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+5, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+6, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+7, row_index, accumulator);
         break;
     case 4:
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+3, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+4, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+5, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+6, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+7, row_index, accumulator);
         break;
     case 8:
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+3, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+4, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+5, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+6, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+7, row_index, accumulator);
         break;
     case 16:
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+3, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+4, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+5, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+6, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+7, row_index, accumulator);
         break;
     }
 }
 
-void ncclient::_unroll_decode_16(unsigned char *output, unsigned short position, unsigned char row_index)
+void ncclient::_unroll_decode_16(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index)
 {
     unsigned char accumulator;
-    switch(_MAX_BLOCK_SIZE)
+    switch(session_info->_MAX_BLOCK_SIZE)
     {
     case 2:
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+3, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+4, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+5, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+6, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+7, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+8, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+9, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+10, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+11, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+12, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+13, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+14, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_2(_rx_buffer, position+15, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+8, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+9, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+10, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+11, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+12, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+13, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+14, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_2(session_info, _rx_buffer, position+15, row_index, accumulator);
         break;
     case 4:
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+3, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+4, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+5, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+6, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+7, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+8, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+9, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+10, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+11, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+12, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+13, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+14, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_4(_rx_buffer, position+15, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+8, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+9, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+10, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+11, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+12, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+13, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+14, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_4(session_info, _rx_buffer, position+15, row_index, accumulator);
         break;
     case 8:
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+3, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+4, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+5, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+6, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+7, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+8, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+9, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+10, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+11, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+12, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+13, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+14, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_8(_rx_buffer, position+15, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+8, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+9, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+10, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+11, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+12, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+13, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+14, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_8(session_info, _rx_buffer, position+15, row_index, accumulator);
         break;
     case 16:
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+1, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+2, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+3, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+4, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+5, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+6, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+7, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+8, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+9, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+10, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+11, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+12, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+13, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+14, row_index, accumulator);
-        UNROLL_MATRIX_MULTIPLICATION_16(_rx_buffer, position+15, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+1, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+2, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+3, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+4, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+5, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+6, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+7, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+8, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+9, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+10, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+11, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+12, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+13, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+14, row_index, accumulator);
+        UNROLL_MATRIX_MULTIPLICATION_16(session_info, _rx_buffer, position+15, row_index, accumulator);
         break;
     }
 }
 
-void ncclient::_unroll_decode_32(unsigned char *output, unsigned short position, unsigned char row_index)
+void ncclient::_unroll_decode_32(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index)
 {
-    _unroll_decode_16(output, position, row_index);
-    _unroll_decode_16(output, position+16, row_index);
+    _unroll_decode_16(session_info, output, position, row_index);
+    _unroll_decode_16(session_info, output, position+16, row_index);
 }
 
-void ncclient::_unroll_decode_64(unsigned char *output, unsigned short position, unsigned char row_index)
+void ncclient::_unroll_decode_64(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index)
 {
-    _unroll_decode_16(output, position, row_index);
-    _unroll_decode_16(output, position+16, row_index);
-    _unroll_decode_16(output, position+32, row_index);
-    _unroll_decode_16(output, position+48, row_index);
+    _unroll_decode_16(session_info, output, position, row_index);
+    _unroll_decode_16(session_info, output, position+16, row_index);
+    _unroll_decode_16(session_info, output, position+32, row_index);
+    _unroll_decode_16(session_info, output, position+48, row_index);
 }
 
-void ncclient::_unroll_decode_128(unsigned char *output, unsigned short position, unsigned char row_index)
+void ncclient::_unroll_decode_128(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index)
 {
-    _unroll_decode_16(output, position, row_index);
-    _unroll_decode_16(output, position+16, row_index);
-    _unroll_decode_16(output, position+32, row_index);
-    _unroll_decode_16(output, position+48, row_index);
-    _unroll_decode_16(output, position+64, row_index);
-    _unroll_decode_16(output, position+80, row_index);
-    _unroll_decode_16(output, position+96, row_index);
-    _unroll_decode_16(output, position+112, row_index);
+    _unroll_decode_16(session_info, output, position, row_index);
+    _unroll_decode_16(session_info, output, position+16, row_index);
+    _unroll_decode_16(session_info, output, position+32, row_index);
+    _unroll_decode_16(session_info, output, position+48, row_index);
+    _unroll_decode_16(session_info, output, position+64, row_index);
+    _unroll_decode_16(session_info, output, position+80, row_index);
+    _unroll_decode_16(session_info, output, position+96, row_index);
+    _unroll_decode_16(session_info, output, position+112, row_index);
 
 }
 
-void ncclient::_unroll_decode_256(unsigned char *output, unsigned short position, unsigned char row_index)
+void ncclient::_unroll_decode_256(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index)
 {
-    _unroll_decode_128(output, position, row_index);
-    _unroll_decode_128(output, position+128, row_index);
+    _unroll_decode_128(session_info, output, position, row_index);
+    _unroll_decode_128(session_info, output, position+128, row_index);
 }
 
-void ncclient::_unroll_decode_512(unsigned char *output, unsigned short position, unsigned char row_index)
+void ncclient::_unroll_decode_512(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index)
 {
-    _unroll_decode_128(output, position, row_index);
-    _unroll_decode_128(output, position+128, row_index);
-    _unroll_decode_128(output, position+256, row_index);
-    _unroll_decode_128(output, position+384, row_index);
+    _unroll_decode_128(session_info, output, position, row_index);
+    _unroll_decode_128(session_info, output, position+128, row_index);
+    _unroll_decode_128(session_info, output, position+256, row_index);
+    _unroll_decode_128(session_info, output, position+384, row_index);
 }
 
-void ncclient::_unroll_decode_1024(unsigned char *output, unsigned short position, unsigned char row_index)
+void ncclient::_unroll_decode_1024(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index)
 {
-    _unroll_decode_512(output, position, row_index);
-    _unroll_decode_512(output, position+512, row_index);
+    _unroll_decode_512(session_info, output, position, row_index);
+    _unroll_decode_512(session_info, output, position+512, row_index);
 }
 
 
-bool ncclient::open_client(std::function<void (unsigned char *, unsigned int)> rx_handler)
+ncclient::ncclient(unsigned short int port, std::function<void (unsigned char *, unsigned int)> rx_handler): \
+    _DATA_ADDR(addr(INADDR_ANY, port)), _receive_callback(rx_handler)
 {
-    std::lock_guard<std::mutex> lock(_lock);
-
-    if(_state == ncclient::OPEN)
-    {
-        return true;
-    }
+    _state = ncclient::STATE::INIT_FAILURE;
 
     _socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if(_socket == -1)
     {
-        return false;
+        return;
     }
 
     const int opt = 1;
@@ -636,7 +705,7 @@ bool ncclient::open_client(std::function<void (unsigned char *, unsigned int)> r
     {
         close(_socket);
         _socket = -1;
-        return false;
+        return;
     }
 
     const timeval tv = {0, 500};
@@ -644,139 +713,40 @@ bool ncclient::open_client(std::function<void (unsigned char *, unsigned int)> r
     {
         close(_socket);
         _socket = -1;
-        return false;
+        return;
     }
     if(setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == -1)
     {
         close(_socket);
         _socket = -1;
-        return false;
+        return;
     }
 
     if(bind(_socket, (sockaddr*)&_DATA_ADDR, sizeof(_DATA_ADDR)) == -1)
     {
         close(_socket);
         _socket = -1;
-        return false;
+        return;
     }
-
-    try{
-        _buffer = new PktBuffer[_MAX_BLOCK_SIZE];
-    }catch(std::exception &ex){
-        _buffer = nullptr;
-        close(_socket);
-        _socket = -1;
-        return false;
-    }
-
-    int buffer_index = 0;
-    try{
-        for(buffer_index = 0 ; buffer_index < (int)_MAX_BLOCK_SIZE ; buffer_index++){
-            _buffer[buffer_index].delivered = false;
-            _buffer[buffer_index].buffer = new unsigned char[TOTAL_HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE)];
-            memset(_buffer[buffer_index].buffer, 0x0, TOTAL_HEADER_SIZE(_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(_MAX_BLOCK_SIZE));
-        }
-    }catch(std::exception &ex){
-        for(--buffer_index; buffer_index >= 0 ; buffer_index--){
-            delete [] _buffer[buffer_index].buffer;
-        }
-        delete [] _buffer;
-        _buffer = nullptr;
-        close(_socket);
-        _socket = -1;
-        return false;
-    }
-
-    try{
-        _decoding_matrix = new DecodingBuffer[_MAX_BLOCK_SIZE];
-    }catch(std::exception &ex){
-        for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++){
-            delete [] _buffer[i].buffer;
-        }
-        delete [] _buffer;
-        _buffer = nullptr;
-        close(_socket);
-        _socket = -1;
-        return false;
-    }
-
-    buffer_index = 0;
-    try{
-        for(buffer_index = 0 ; buffer_index < (int)_MAX_BLOCK_SIZE ; buffer_index++){
-            _decoding_matrix[buffer_index].encode = new unsigned char[_MAX_BLOCK_SIZE];
-            memset(_decoding_matrix[buffer_index].encode, 0x0, _MAX_BLOCK_SIZE);
-        }
-    }catch(std::exception &ex){
-        for(--buffer_index ; buffer_index >= 0 ; buffer_index--){
-            delete [] _decoding_matrix[buffer_index].encode;
-        }
-        delete [] _decoding_matrix;
-        for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++){
-            delete [] _buffer[i].buffer;
-        }
-        delete [] _buffer;
-        _buffer = nullptr;
-        close(_socket);
-        _socket = -1;
-        return false;
-    }
-
-    buffer_index = 0;
-    try{
-        for(buffer_index = 0 ; buffer_index < (int)_MAX_BLOCK_SIZE ; buffer_index++){
-            _decoding_matrix[buffer_index].empty = true;
-            _decoding_matrix[buffer_index].decode = new unsigned char[_MAX_BLOCK_SIZE];
-            memset(_decoding_matrix[buffer_index].decode, 0x0, _MAX_BLOCK_SIZE);
-            _decoding_matrix[buffer_index].decode[buffer_index] = 1;
-        }
-    }catch(std::exception &ex){
-        for(--buffer_index ; buffer_index >= 0 ; buffer_index--){
-            delete [] _decoding_matrix[buffer_index].decode;
-        }
-        for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++){
-            delete [] _decoding_matrix[i].encode;
-        }
-        delete [] _decoding_matrix;
-        for(int i = 0 ; i < _MAX_BLOCK_SIZE ; i++){
-            delete [] _buffer[i].buffer;
-        }
-        delete [] _buffer;
-        _buffer = nullptr;
-        close(_socket);
-        _socket = -1;
-        return false;
-    }
-
-    _receive_callback = rx_handler;
-    _rank = 0;
-    _blk_seq = 0;
-    _losses = 0;
     _rx_thread_running = true;
     _rx_thread = std::thread([&](){this->_receive_handler();});
-    _state = ncclient::OPEN;
-    return true;
+    _state = ncclient::STATE::INIT_SUCCESS;
 }
 
-void ncclient::close_client()
+ncclient::~ncclient()
 {
-    std::lock_guard<std::mutex> lock(_lock);
-
-    if(_state == ncclient::CLOSE)
+    if(_state == ncclient::STATE::INIT_FAILURE)
     {
         return;
     }
     _rx_thread_running = false;
     _rx_thread.join();
-
-    _receive_callback = nullptr;
-
-    for(unsigned int i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
-    {
-        delete [] (_buffer[i].buffer);
-    }
-    delete []_buffer;
-    _buffer = nullptr;
+    _server_session_info.perform_for_all_data([](server_session_info* session){
+        delete session;
+        session = nullptr;
+    });
+    _server_session_info.clear();
     close(_socket);
     _socket = -1;
-    _state = ncclient::CLOSE;
+    _state = ncclient::INIT_FAILURE;
 }
