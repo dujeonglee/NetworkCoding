@@ -2,6 +2,11 @@
   - Implementation of network coding data transportation.
   - Example code can be found in main.cpp.
 
+# Why network coding transport
+  - Provide reliable packet transport 
+  - Guarantee packet order
+  - Data is not stream but block, like UDP.
+
 # Contributions
   - I welcome any contributions from you.
 
