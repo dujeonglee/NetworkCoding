@@ -20,7 +20,16 @@
 
 ncserver nc_server(port, retransmission_timeout);
 nc_server.open_session(client_ip, client_port, BLOCK_SIZE::SIZE8);
-nc_server.send(client_ip, client_port, buffer, buffer_size);
+nc_server.send(client_ip, client_port, buffer, buffer_size, false);
+nc_server.send(client_ip, client_port, buffer, buffer_size, false);
+nc_server.send(client_ip, client_port, buffer, buffer_size, false);
+...
+...
+nc_server.send(client_ip, client_port, buffer, buffer_size, false);
+nc_server.send(client_ip, client_port, buffer, buffer_size, false);
+nc_server.send(client_ip, client_port, buffer, buffer_size, false);
+/*Indicate that this is the last transmission by passing true for the last parameter*/
+nc_server.send(client_ip, client_port, buffer, buffer_size, true);
 ```
   - Client
 ```
