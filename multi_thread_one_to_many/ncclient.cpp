@@ -400,7 +400,19 @@ void ncclient::_receive_handler()
         server_session_info* session_info = nullptr;
         if(lookup_result == nullptr)
         {
-            session_info = new server_session_info(GET_OUTER_MAX_BLK_SIZE(_rx_buffer));
+            try
+            {
+                session_info = new server_session_info(GET_OUTER_MAX_BLK_SIZE(_rx_buffer));
+            }
+            catch(std::exception ex)
+            {
+                continue;
+            }
+            if(session_info->_state == server_session_info::STATE::INIT_FAILURE)
+            {
+                delete session_info;
+                continue;
+            }
             _server_session_info.insert(key, session_info);
         }
         else

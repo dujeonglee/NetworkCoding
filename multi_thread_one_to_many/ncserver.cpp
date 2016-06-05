@@ -193,6 +193,11 @@ bool ncserver::open_session(unsigned int client_ip, unsigned short int cport, BL
         {
             return false;
         }
+        if(new_tx_session_info->_state == client_session_info::STATE::INIT_FAILURE)
+        {
+            delete new_tx_session_info;
+            return false;
+        }
         if(_tx_session_info.insert(key, new_tx_session_info) == false)
         {
             delete new_tx_session_info;
