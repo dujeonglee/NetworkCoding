@@ -8,5 +8,6 @@
 # Done
   - Thread-safe
   - Tx / Rx Multiplexing
+
 # TODO
   - Full duplex communication on single socket
