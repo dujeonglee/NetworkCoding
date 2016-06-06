@@ -24,7 +24,7 @@
 ```C++
 #include "ncsocket.h"
 
-void rx_callback(unsigned char* buff, unsigned int size){
+void rx_callback(unsigned char* buff, unsigned int size, sockaddr_in sender){
   /*Do something with the data*/
 }
 
