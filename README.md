@@ -12,13 +12,11 @@
 
 # Done
   - Thread-safe
-  - Tx / Rx Multiplexing
-  - Half-duplex communication
-  - Full duplex communication
+  - Full-duplex communication
 
 # TODO
-  - Session close and open logic for robust operation
-  - Multicast error control
+  - Session control (open / close) implementation
+  - Extention to multicast transmission.
 
 #Example
 ```C++
