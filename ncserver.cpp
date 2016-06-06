@@ -1,16 +1,18 @@
 #include "ncserver.h"
 
-sockaddr_in addr(unsigned int ip, unsigned short int port)
+extern sockaddr_in addr(unsigned int ip, unsigned short int port);
+
+ncserver::ncserver(int socket): _SOCKET(socket){}
+ncserver::~ncserver()
 {
-    sockaddr_in ret = {0};
-    ret.sin_family = AF_INET;
-    ret.sin_addr.s_addr = htonl(ip);
-    ret.sin_port = htons(port);
-    return ret;
+    _tx_session_info.perform_for_all_data([](client_session_info* session){
+        delete session;
+        session = nullptr;
+    });
 }
 
-client_session_info::client_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size):\
-    _DATA_ADDR(addr(client_ip, cport)), _MAX_BLOCK_SIZE(block_size) {
+client_session_info::client_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout):\
+    _DATA_ADDR(addr(client_ip, cport)), _MAX_BLOCK_SIZE(block_size), _TIMEOUT(timeout) {
     _state = client_session_info::STATE::INIT_FAILURE;
     try{
         _buffer = new NetworkCodingPktBuffer [_MAX_BLOCK_SIZE];
@@ -54,7 +56,7 @@ bool ncserver::_send_remedy_pkt(client_session_info * const info)
     }
     if(info->_tx_cnt == 0)
     {
-        return (int)GET_OUTER_SIZE(info->_buffer[0].buffer) == sendto(_socket, info->_buffer[0].buffer, GET_OUTER_SIZE(info->_buffer[0].buffer), 0, (sockaddr*)&info->_DATA_ADDR, sizeof(info->_DATA_ADDR));
+        return (int)GET_OUTER_SIZE(info->_buffer[0].buffer) == sendto(_SOCKET, info->_buffer[0].buffer, GET_OUTER_SIZE(info->_buffer[0].buffer), 0, (sockaddr*)&info->_DATA_ADDR, sizeof(info->_DATA_ADDR));
     }
     memset(info->_remedy_pkt.buffer, 0x0, TOTAL_HEADER_SIZE(info->_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(info->_MAX_BLOCK_SIZE));
     // Generate random cofficient.
@@ -65,6 +67,7 @@ bool ncserver::_send_remedy_pkt(client_session_info * const info)
     }
 
     // Fill-in header information
+    GET_OUTER_TYPE(info->_remedy_pkt.buffer) = NC_PKT_TYPE::DATA_TYPE;
     GET_OUTER_SIZE(info->_remedy_pkt.buffer) = TOTAL_HEADER_SIZE(info->_MAX_BLOCK_SIZE)+info->_largest_pkt_size;
     GET_OUTER_BLK_SEQ(info->_remedy_pkt.buffer) = info->_blk_seq;
     GET_OUTER_BLK_SIZE(info->_remedy_pkt.buffer) = info->_tx_cnt;
@@ -84,110 +87,19 @@ bool ncserver::_send_remedy_pkt(client_session_info * const info)
     {
         return false;
     }
-    const bool ret = (int)GET_OUTER_SIZE(info->_remedy_pkt.buffer) == sendto(_socket, info->_remedy_pkt.buffer, GET_OUTER_SIZE(info->_remedy_pkt.buffer), 0, (sockaddr*)&info->_DATA_ADDR, sizeof(info->_DATA_ADDR));
+    const bool ret = (int)GET_OUTER_SIZE(info->_remedy_pkt.buffer) == sendto(_SOCKET, info->_remedy_pkt.buffer, GET_OUTER_SIZE(info->_remedy_pkt.buffer), 0, (sockaddr*)&info->_DATA_ADDR, sizeof(info->_DATA_ADDR));
     return ret;
 }
 
-ncserver::ncserver(unsigned short int svrport, unsigned int timeout):\
-    _CTRL_ADDR(addr(INADDR_ANY, svrport)), _TIMEOUT(timeout)
+bool ncserver::open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout)
 {
-    _state = ncserver::STATE::INIT_FAILURE;
-    _socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if(_socket == -1)
-    {
-        return;
-    }
-    const int opt = 1;
-    if(setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1)
-    {
-        close(_socket);
-        _socket = -1;
-        return;
-    }
-    const timeval tv = {_TIMEOUT/1000, _TIMEOUT%1000};
-    if(setsockopt(_socket, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) == -1)
-    {
-        close(_socket);
-        _socket = -1;
-        return;
-    }
-    if(setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == -1)
-    {
-        close(_socket);
-        _socket = -1;
-        return;
-    }
-    if(bind(_socket, (sockaddr*)&_CTRL_ADDR, sizeof(_CTRL_ADDR)) == -1)
-    {
-        close(_socket);
-        _socket = -1;
-        return;
-    }
-    _ack_reception_thread_running = true;
-    _ack_reception_thread = std::thread([&](){
-        while(_ack_reception_thread_running)
-        {
-            Ack ack_pkt = {0,};
-            struct sockaddr_in client_addr = {0,};
-            unsigned int client_addr_size = sizeof(client_addr);
-            int ret = recvfrom(_socket, (void*)&ack_pkt, sizeof(ack_pkt), 0, (sockaddr*)&client_addr, &client_addr_size);
-            if(ret == sizeof(ack_pkt))
-            {
-                const ip_port_key key = {ntohl(client_addr.sin_addr.s_addr), ntohs(client_addr.sin_port)};
-                client_session_info** const session = _tx_session_info.find(key);
-                if(session != nullptr)
-                {
-                    if(ack_pkt.blk_seq == (*session)->_blk_seq)
-                    {
-                        (*session)->_retransmission_in_progress = false;
-                        (*session)->_loss_rate = ((*session)->_loss_rate + (float)ack_pkt.losses)/2.;
-                    }
-                    else
-                    {
-                        // Packets of new block sequence may be lost. We can ignore this packet.
-                    }
-                }
-                else
-                {
-                    // To Do: Deal with zombie client
-                }
-            }
-        }
-    });
-    _ack_reception_thread.detach();
-    _state = ncserver::STATE::INIT_SUCCESS;
-}
-
-/*
- * Destructor: Release resources by "close_server".
- */
-ncserver::~ncserver()
-{
-    if(_state == ncserver::STATE::INIT_FAILURE)
-    {
-        return;
-    }
-    _tx_session_info.perform_for_all_data([](client_session_info* session){
-        delete session;
-        session = nullptr;
-    });
-    close(_socket);
-    _socket = -1;
-}
-
-bool ncserver::open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size)
-{
-    if(_state == ncserver::STATE::INIT_FAILURE)
-    {
-        return false;
-    }
     client_session_info* new_tx_session_info = nullptr;
     const ip_port_key key = {client_ip, cport};
     if(_tx_session_info.find(key) == false)
     {
         try
         {
-            new_tx_session_info = new client_session_info(client_ip, cport, block_size);
+            new_tx_session_info = new client_session_info(client_ip, cport, block_size, timeout);
         }
         catch(std::exception ex)
         {
@@ -209,10 +121,6 @@ bool ncserver::open_session(unsigned int client_ip, unsigned short int cport, BL
 
 void ncserver::close_session(unsigned int client_ip, unsigned short int cport)
 {
-    if(_state == ncserver::STATE::INIT_FAILURE)
-    {
-        return;
-    }
     const ip_port_key key = {client_ip, cport};
     client_session_info** session = nullptr;
     if((session = _tx_session_info.find(key)) != nullptr)
@@ -229,11 +137,6 @@ void ncserver::close_session(unsigned int client_ip, unsigned short int cport)
  */
 unsigned short int ncserver::send(unsigned int client_ip, unsigned short int cport, unsigned char* pkt, unsigned short int pkt_size, const bool complete_block)
 {
-    if(_state == ncserver::STATE::INIT_FAILURE)
-    {
-        printf("asdfasdf\n");
-        return 0;
-    }
     const ip_port_key key = {client_ip, cport};
     client_session_info** const session = _tx_session_info.find(key);
     if(session == nullptr)
@@ -262,8 +165,9 @@ unsigned short int ncserver::send(unsigned int client_ip, unsigned short int cpo
     const unsigned char* pkt_buffer = (*session)->_buffer[(*session)->_tx_cnt].buffer;
     const bool invoke_retransmission = ((*session)->_tx_cnt == (*session)->_MAX_BLOCK_SIZE - 1) || (complete_block == true);
 
-    GET_OUTER_BLK_SEQ(pkt_buffer) = (*session)->_blk_seq;
+    GET_OUTER_TYPE(pkt_buffer) = NC_PKT_TYPE::DATA_TYPE;
     GET_OUTER_SIZE(pkt_buffer) = TOTAL_HEADER_SIZE((*session)->_MAX_BLOCK_SIZE)+pkt_size;
+    GET_OUTER_BLK_SEQ(pkt_buffer) = (*session)->_blk_seq;
     GET_OUTER_BLK_SIZE(pkt_buffer) = (*session)->_tx_cnt;
     GET_OUTER_MAX_BLK_SIZE(pkt_buffer) = (*session)->_MAX_BLOCK_SIZE;
     GET_OUTER_FLAGS(pkt_buffer) = OuterHeader::FLAGS_ORIGINAL;
@@ -283,7 +187,7 @@ unsigned short int ncserver::send(unsigned int client_ip, unsigned short int cpo
     // Send data packet
     //PRINT_OUTERHEADER(pkt_buffer);
     //PRINT_INNERHEADER(_MAX_BLOCK_SIZE, pkt_buffer);
-    sendto(_socket, pkt_buffer, GET_OUTER_SIZE(pkt_buffer), 0, (sockaddr*)&(*session)->_DATA_ADDR, sizeof((*session)->_DATA_ADDR));
+    sendto(_SOCKET, pkt_buffer, GET_OUTER_SIZE(pkt_buffer), 0, (sockaddr*)&(*session)->_DATA_ADDR, sizeof((*session)->_DATA_ADDR));
     if(invoke_retransmission)
     {
         for(unsigned char i = 0 ; i < loss_rate+1 ; i++)
@@ -293,7 +197,7 @@ unsigned short int ncserver::send(unsigned int client_ip, unsigned short int cpo
         while((*session)->_retransmission_in_progress)
         {
             _send_remedy_pkt((*session));
-            std::this_thread::sleep_for (std::chrono::milliseconds(0));
+            std::this_thread::sleep_for (std::chrono::milliseconds((*session)->_TIMEOUT));
         }
         unsigned short next_blk_seq = 0;
         do
@@ -310,4 +214,35 @@ unsigned short int ncserver::send(unsigned int client_ip, unsigned short int cpo
     }
     (*session)->_lock.unlock();
     return pkt_size;
+}
+
+void ncserver::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* sender_addr, unsigned int sender_addr_len)
+{
+    Ack* const ack = (Ack*)buffer;
+    if(ack->type != NC_PKT_TYPE::ACK_TYPE)
+    {
+        return;
+    }
+    if(size != sizeof(Ack))
+    {
+        return;
+    }
+    const ip_port_key key = {ntohl(sender_addr->sin_addr.s_addr), ntohs(sender_addr->sin_port)};
+    client_session_info** const session = _tx_session_info.find(key);
+    if(session != nullptr)
+    {
+        if(ack->blk_seq == (*session)->_blk_seq)
+        {
+            (*session)->_retransmission_in_progress = false;
+            (*session)->_loss_rate = ((*session)->_loss_rate + (float)ack->losses)/2.;
+        }
+        else
+        {
+            // Packets of new block sequence may be lost. We can ignore this packet.
+        }
+    }
+    else
+    {
+        // To Do: Deal with zombie client
+    }
 }

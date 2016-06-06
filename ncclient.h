@@ -41,51 +41,86 @@ struct PktBuffer
 class server_session_info{
     friend class ncclient;
 public:
+    /**
+     * @brief The STATE enum: Indicate if the resource is successfully allocated
+     */
     enum STATE: unsigned char
     {
-        INIT_FAILURE,
-        INIT_SUCCESS
+        INIT_FAILURE, // Resource allocation failure
+        INIT_SUCCESS// Resource allocation is success
     };
+    /**
+     * @brief _state: Resource allocation state
+     * Either INIT_FAILURE or INIT_SUCCESS
+     */
     server_session_info::STATE _state;
+    /**
+     * @brief _ADDR: Sender address
+     */
+    const sockaddr_in _ADDR;
+    /**
+     * @brief _MAX_BLOCK_SIZE: The maximum block size for network coding
+     */
     const unsigned char _MAX_BLOCK_SIZE;
+    /**
+     * @brief _rank: The rank of the packets in "_buffer"
+     */
     unsigned char _rank;
+    /**
+     * @brief _buffer: Packet buffer
+     */
     PktBuffer* _buffer;
+    /**
+     * @brief _decoding_buffer: Buffer to store a decoded packet for receive callback function
+     */
+    NetworkCodingPktBuffer _decoding_buffer;
+    /**
+     * @brief _blk_seq: Current block sequence number
+     */
     unsigned short int _blk_seq;
+    /**
+     * @brief _decoding_matrix: Decoding codes are generated from encoding codes by "_decode" function
+     */
     DecodingBuffer* _decoding_matrix;
+    /**
+     * @brief _losses: The number of loss packets in a block
+     */
     unsigned char _losses;
+    /**
+     * @brief _lock: For multi-thread environment
+     */
     std::mutex _lock;
-    server_session_info(unsigned char blk_size);
+    /**
+     * @brief server_session_info: Constructor of server_session_info
+     * @param addr: remote host's address (host byte order)
+     * @param blk_size: The value for "_MAX_BLOCK_SIZE"
+     */
+    server_session_info(sockaddr_in addr, unsigned char blk_size);
+    /**
+     * @brief ~server_session_info
+     */
     ~server_session_info();
 };
 
 class ncclient
 {
+    friend class ncsocket;
 private:
     enum STATE: unsigned char
     {
         INIT_FAILURE = 0,
         INIT_SUCCESS
     };
-    const sockaddr_in _DATA_ADDR;
-
-    ncclient::STATE _state;
-    int _socket;
-    std::thread _rx_thread;
-    bool _rx_thread_running;
-    unsigned char _rx_buffer[1500];
-    const std::function <void (unsigned char *, unsigned int length)> _receive_callback;
+    const int _SOCKET;
+    const std::function <void (unsigned char* buffer, unsigned int length, sockaddr_in addr)> _receive_callback;
     avltree<ip_port_key, server_session_info*> _server_session_info;
-
-public:
-    ncclient(unsigned short int port, std::function <void (unsigned char *, unsigned int length)> rx);
+    ncclient(int socket, std::function <void (unsigned char* buffer, unsigned int length, sockaddr_in addr)> rx);
     ~ncclient();
-
-private:
+    void _rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* sender_addr, unsigned int sender_addr_len);
     bool _handle_original_packet(server_session_info* const session_info, const unsigned char * const pkt, int size);
     int _innovative(server_session_info * const session_info, unsigned char* pkt);
     void _decode(server_session_info * const session_info, unsigned char *pkt, int size);
     bool _handle_remedy_packet(server_session_info * const session_info, unsigned char *pkt, int size);
-    void _receive_handler();
     void _unroll_decode_2(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index);
     void _unroll_decode_4(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index);
     void _unroll_decode_8(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index);
@@ -96,9 +131,5 @@ private:
     void _unroll_decode_256(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index);
     void _unroll_decode_512(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index);
     void _unroll_decode_1024(server_session_info * const session_info, unsigned char *output, unsigned short position, unsigned char row_index);
-public:
-    unsigned short int recv(unsigned char* pkt, unsigned short int pkt_size);
-    bool open_client(std::function <void (unsigned char *, unsigned int length)> rx_handler);
-    void close_client();
 };
 #endif

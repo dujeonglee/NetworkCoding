@@ -44,6 +44,10 @@ private:
      */
     const BLOCK_SIZE _MAX_BLOCK_SIZE;
     /**
+     * @brief _TIMEOUT: Rx and Tx timeout value.
+     */
+    const unsigned int _TIMEOUT;
+    /**
      * @brief _buffer: Packet buffer
      */
     NetworkCodingPktBuffer* _buffer;
@@ -92,7 +96,7 @@ private:
      * @param cport: Client's port number (host byte order)
      * @param block_size: Maximum block size.
      */
-    client_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size);
+    client_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout);
     /**
      * @brief ~tx_session_info: Destructor of client session information
      */
@@ -102,46 +106,17 @@ private:
 
 class ncserver
 {
+    friend class ncsocket;
 private:
-    /**
-     * @brief The STATE enum: Indicate if the resource is successfully allocated
-     */
-    enum STATE: unsigned char{
-        INIT_FAILURE,
-        INIT_SUCCESS
-    };
-    /**
-     * @brief _state: Resource allocation state
-     * Either INIT_FAILURE or INIT_SUCCESS
-     */
-    STATE _state;
     /**
      * @brief _socket: Socket to communicate with clients
      * Server sends and receives data and acks on this socket.
      */
-    int _socket;
-    /**
-     * @brief _CTRL_ADDR: Rx socket address for control packets from clients.
-     */
-    const sockaddr_in _CTRL_ADDR;
-    /**
-     * @brief _TIMEOUT: Rx and Tx timeout value.
-     */
-    const unsigned int _TIMEOUT;
+    const int _SOCKET;
     /**
      * @brief _tx_session_info: Hash table data structure maintaining a list of clients. (thread-safe)
      */
     avltree<ip_port_key, client_session_info*> _tx_session_info;
-    /**
-     * @brief _ack_reception_thread_running: Indicate if "_ack_reception_thread" is running.
-     */
-    bool _ack_reception_thread_running;
-    /**
-     * @brief _ack_reception_thread: Thread handle for handing acks from clients.
-     * When it receives an ack, it finds the relavent "tx_session_info".
-     * Then it sets "_retransmission_in_progress" as false and updates "_loss_rate" with the value in the ack.
-     */
-    std::thread _ack_reception_thread;
 
     /**
      * @brief _send_remedy_pkt: Send remedy packet for client "info"
@@ -149,14 +124,12 @@ private:
      * @return: On success true. Otherwise, false.
      */
     bool _send_remedy_pkt(client_session_info* const info);
-
-public:
     /**
      * @brief ncserver: Creator of ncserver
      * @param svrport: Server control port number that will be passed to "_CTRL_ADDR".
      * @param timeout: Tx / Rx timeout value that will be passed to "_TIMEOUT"
      */
-    ncserver(unsigned short int svrport, unsigned int timeout);
+    ncserver(int socket);
     /**
      * @brief ~ncserver: Destructor of ncserver
      */
@@ -168,7 +141,7 @@ public:
      * @param block_size: Maximum block size chosen from BLOCK_SIZE
      * @return: On success true. Otherwise, false
      */
-    bool open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size);
+    bool open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout);
     /**
      * @brief close_session: Close a client session.
      * @param client_ip: Client ip address that you want to close (host byte order)
@@ -185,6 +158,7 @@ public:
      * @return: The number of bytes sent.
      */
     unsigned short int send(unsigned int client_ip, unsigned short int cport, unsigned char* pkt, unsigned short int pkt_size, const bool complete_block);
+    void _rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* sender_addr, unsigned int sender_addr_len);
 };
 
 #endif

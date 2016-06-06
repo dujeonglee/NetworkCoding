@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #define OUTER_HEADER_SIZE                                              (sizeof(OuterHeader))
+#define GET_OUTER_TYPE(pkt)                                             (*(unsigned char*)         ((unsigned char*)pkt + offsetof(OuterHeader, type)))
 #define GET_OUTER_SIZE(pkt)                                             (*(unsigned short int*)  ((unsigned char*)pkt + offsetof(OuterHeader, size)))
 #define GET_OUTER_BLK_SEQ(pkt)                                     (*(unsigned short int*)  ((unsigned char*)pkt + offsetof(OuterHeader, blk_seq)))
 #define GET_OUTER_BLK_SIZE(pkt)                                     (*(unsigned char*)         ((unsigned char*)pkt + offsetof(OuterHeader, blk_size)))
@@ -13,12 +14,19 @@
 #define GET_INNER_LAST_INDICATOR(pkt)                        (*(unsigned char*)          ((unsigned char*)pkt + sizeof(OuterHeader) + offsetof(InnerHeader, last_indicator)))
 #define GET_INNER_CODE(pkt)                                           ((unsigned char*)pkt + sizeof(OuterHeader) + offsetof(InnerHeader, codes))
 #define GET_INNER_PAYLOAD(pkt, max_block_size)         ((unsigned char*)pkt + sizeof(OuterHeader) + sizeof(InnerHeader) + (max_block_size-1))
-
+#define ETHERNET_MTU                                                      (1500)
 #define TOTAL_HEADER_SIZE(max_block_size)                  (sizeof(OuterHeader) + sizeof(InnerHeader) + (max_block_size-1))
-#define MAX_PAYLOAD_SIZE(max_block_size)                  (1500/*ETHERNET MTU*/ - 20/*IP*/ - 8/*UDP*/ - TOTAL_HEADER_SIZE(max_block_size))
-#define MAX_BUFFER_SIZE                                                  (1500 - 20 - 8)
+#define MAX_PAYLOAD_SIZE(max_block_size)                  (ETHERNET_MTU - 20/*IP*/ - 8/*UDP*/ - TOTAL_HEADER_SIZE(max_block_size))
+#define MAX_BUFFER_SIZE                                                  (ETHERNET_MTU - 20 - 8)
+
+enum NC_PKT_TYPE : unsigned char{
+    DATA_TYPE = 0,
+    ACK_TYPE
+};
+
 struct OuterHeader
 {
+    unsigned char type;
     unsigned short int size;          /*2*/
     unsigned short int blk_seq;    /*2*/
     unsigned char blk_size;          /*1*/
@@ -73,6 +81,7 @@ do\
 
 struct Ack
 {
+    unsigned char type;
     unsigned short int blk_seq;    /*2*/
     unsigned char losses;             /*1*/
 }__attribute__((packed));
