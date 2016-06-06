@@ -14,35 +14,30 @@
   - Thread-safe
   - Tx / Rx Multiplexing
   - Half-duplex communication
-
-# TODO
   - Full duplex communication
 
-#Example
-  - Server
-```
-#include "ncserver.h"
+# TODO
+  - Session close and open logic for robust operation
+  - Multicast error control
 
-ncserver nc_server(port, retransmission_timeout);
-nc_server.open_session(client_ip, client_port, BLOCK_SIZE::SIZE8);
-nc_server.send(client_ip, client_port, buffer, buffer_size, false);
-nc_server.send(client_ip, client_port, buffer, buffer_size, false);
-nc_server.send(client_ip, client_port, buffer, buffer_size, false);
-...
-...
-nc_server.send(client_ip, client_port, buffer, buffer_size, false);
-nc_server.send(client_ip, client_port, buffer, buffer_size, false);
-nc_server.send(client_ip, client_port, buffer, buffer_size, false);
-/*Indicate that this is the last transmission by passing true for the last parameter*/
-nc_server.send(client_ip, client_port, buffer, buffer_size, true);
-```
-  - Client
-```
-#include "ncclient.h"
+#Example
+```C++
+#include "ncsocket.h"
 
 void rx_callback(unsigned char* buff, unsigned int size){
   /*Do something with the data*/
 }
 
-ncclient nc_client(rx_port, rx_callback);
+ncsocket nc_socket(port, tx_timeout, rx_timeout, rx_callback);
+nc_socket.open_session(client_ip, client_port, BLOCK_SIZE::SIZE8, retransmission_interval);
+nc_socket.send(client_ip, client_port, buffer, buffer_size, false);
+nc_socket.send(client_ip, client_port, buffer, buffer_size, false);
+nc_socket.send(client_ip, client_port, buffer, buffer_size, false);
+...
+...
+nc_socket.send(client_ip, client_port, buffer, buffer_size, false);
+nc_socket.send(client_ip, client_port, buffer, buffer_size, false);
+nc_socket.send(client_ip, client_port, buffer, buffer_size, false);
+/*Indicate that this is the last transmission by passing true for the last parameter*/
+nc_socket.send(client_ip, client_port, buffer, buffer_size, true);
 ```
