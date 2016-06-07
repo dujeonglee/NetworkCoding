@@ -4,65 +4,407 @@
 #include <atomic>
 #include "ncsocket.h"
 
+unsigned char seq = 0;
 unsigned int bytes_received = 0;
-void rx(unsigned char * buff, unsigned int size, sockaddr_in addr){
+void rx_callback_test1(unsigned char* buffer, unsigned int size, sockaddr_in addr){
     bytes_received += size;
-    if((buff[0]^buff[1]) != buff[2])
-    {
+    if(seq != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
+        printf("Something is wrong: Expect %hhu but get %hhu\n", seq, buffer[0]);
+        exit(-1);
+    }
+    seq++;
+}
+
+unsigned char seq_test2[3] = {1,1,1};
+unsigned int bytes_received_test2[3] ={0,0,0};
+void rx_callback_test2(unsigned char* buffer, unsigned int size, sockaddr_in addr){
+    if(buffer[0] > 0){
+        bytes_received_test2[0] += size;
+        if(seq_test2[0] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
+            printf("Something is wrong1: Expect %hhu but get %hhu\n", seq_test2[0], buffer[0]);
+            exit(-1);
+        }
+        seq_test2[0]++;
+        if(seq_test2[0] == 0){
+            seq_test2[0]++;
+        }
+    }else if(buffer[3] > 0){
+        bytes_received_test2[0] += size;
+        if(seq_test2[1] != buffer[3] || buffer[5] != (buffer[3] ^ buffer[4])){
+            printf("Something is wrong2: Expect %hhu but get %hhu\n", seq_test2[1], buffer[3]);
+            exit(-1);
+        }
+        seq_test2[1]++;
+        if(seq_test2[1] == 0){
+            seq_test2[1]++;
+        }
+    }else{
+        bytes_received_test2[2] += size;
+        if(seq_test2[2] != buffer[6] || buffer[8] != (buffer[6] ^ buffer[7])){
+            printf("Something is wrong3: Expect %hhu but get %hhu\n", seq_test2[2], buffer[6]);
+            exit(-1);
+        }
+        seq_test2[2]++;
+        if(seq_test2[2] == 0){
+            seq_test2[2]++;
+        }
+    }
+}
+
+unsigned char seq_test3[3] = {0,0,0};
+unsigned int bytes_received_test3[3] = {0,0,0};
+void rx_callback_test3(unsigned char* buffer, unsigned int size, sockaddr_in addr){
+    switch(ntohs(addr.sin_port)){
+    case 30000:
+        bytes_received_test3[0] += size;
+        if(seq_test3[0] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
+            printf("Something is wrong2: Expect %hhu but get %hhu\n", seq_test3[0], buffer[0]);
+            exit(-1);
+        }
+        seq_test3[0]++;
+        break;
+    case 30001:
+        bytes_received_test3[1] += size;
+        if(seq_test3[1] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
+            printf("Something is wrong2: Expect %hhu but get %hhu\n", seq_test3[1], buffer[0]);
+            exit(-1);
+        }
+        seq_test3[1]++;
+        break;
+    case 30002:
+        bytes_received_test3[2] += size;
+        if(seq_test3[2] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
+            printf("Something is wrong3: Expect %hhu but get %hhu\n", seq_test3[2], buffer[0]);
+            exit(-1);
+        }
+        seq_test3[2]++;
+        break;
+    default:
         exit(-1);
     }
 }
+
+unsigned char seq_test4[3] = {0,0,0};
+unsigned int bytes_received_test4[3] = {0,0,0};
+void rx_callback_test4_1(unsigned char* buffer, unsigned int size, sockaddr_in addr){
+    bytes_received_test4[0] += size;
+    if(seq_test4[0] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
+        printf("Something is wrong2: Expect %hhu but get %hhu\n", seq_test4[0], buffer[0]);
+        exit(-1);
+    }
+    seq_test4[0]++;
+}
+
+void rx_callback_test4_2(unsigned char* buffer, unsigned int size, sockaddr_in addr){
+    bytes_received_test4[1] += size;
+    if(seq_test4[1] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
+        printf("Something is wrong2: Expect %hhu but get %hhu\n", seq_test4[1], buffer[0]);
+        exit(-1);
+    }
+    seq_test4[1]++;
+}
+
+void rx_callback_test4_3(unsigned char* buffer, unsigned int size, sockaddr_in addr){
+    bytes_received_test4[2] += size;
+    if(seq_test4[2] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
+        printf("Something is wrong2: Expect %hhu but get %hhu\n", seq_test4[2], buffer[0]);
+        exit(-1);
+    }
+    seq_test4[2]++;
+}
+
 int main(int argc, char* argv[])
 {
-    if(strcmp(argv[0], "./server") == 0)
+    // Test1 One sender sends packets to one receiver
     {
-        printf("start server\n");
-        std::thread send_thread_1;
+        unsigned int clientip = 0;
+        ((unsigned char*)&clientip)[3] = 127;
+        ((unsigned char*)&clientip)[2] = 0;
+        ((unsigned char*)&clientip)[1] = 0;
+        ((unsigned char*)&clientip)[0] = 1;
 
-        ncsocket nc_socket(30000, 500, 500, rx);
-        send_thread_1 = std::thread([&](){
-            unsigned int clientip = 0;
-            ((unsigned char*)&clientip)[3] = 127;
-            ((unsigned char*)&clientip)[2] = 0;
-            ((unsigned char*)&clientip)[1] = 0;
-            ((unsigned char*)&clientip)[0] = 1;
-            unsigned short int clientport = 30001;
-
-             if(nc_socket.open_session(clientip, clientport, BLOCK_SIZE::SIZE8, 0) == false)
-             {
-                 exit(-1);
-             }
-             unsigned char data[1000] = {0,};
-             unsigned int bytes_sent = 0;
-             unsigned char data_seq = 0;
-             while(bytes_sent < 99999000)
-             {
-                 data[0] = data_seq++;
-                 data[1] = rand()%256;
-                 data[2] = data[0] ^ data[1];
-                 bytes_sent+=(unsigned int)nc_socket.send(clientip, clientport, data, 1000, false);
-             }
-             data[0] = data_seq++;
-             data[1] = rand()%256;
-             data[2] = data[0] ^ data[1];
-             bytes_sent+=(unsigned int)nc_socket.send(clientip, clientport, data, 1000, true);
-             printf("Complete\n");
-         });
-         send_thread_1.detach();
-         while(1);
-    }
-    else if(strcmp(argv[0], "./client") == 0)
-    {
-        printf("start client\n");
-        ncsocket nc_socket(30001, 500, 500, rx);
-        std::thread rx_thread = std::thread([&](){
-            while(1){
-                printf("Rx bytes %u\n", bytes_received);
-                std::this_thread::sleep_for (std::chrono::milliseconds(1000));
+        ncsocket sender(30000, 500, 500, nullptr);
+        ncsocket receiver(30001, 500, 500, rx_callback_test1);
+        if(sender.open_session(clientip, 30001, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        const unsigned int TEST_SIZE = 100000000;
+        std::thread sending_thread = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += sender.send(clientip, 30001, data, 1000, false);
+                data[0]++;
             }
         });
+        sending_thread.join();
+        std::cout<<"Test1 is passed\n";
+    }
+    // Test2: One sender running multi threads sends packets to one receiver.
+    {
+        unsigned int clientip = 0;
+        ((unsigned char*)&clientip)[3] = 127;
+        ((unsigned char*)&clientip)[2] = 0;
+        ((unsigned char*)&clientip)[1] = 0;
+        ((unsigned char*)&clientip)[0] = 1;
 
-        while(1);
+        ncsocket sender(30000, 500, 500, nullptr);
+        ncsocket receiver(30001, 500, 500, rx_callback_test2);
+        if(sender.open_session(clientip, 30001, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        const unsigned int TEST_SIZE = 100000000;
+        std::atomic<bool> start;
+        start = false;
+        std::atomic<bool> thread_1_done;
+        thread_1_done = false;
+        std::thread sending_thread_1 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            data[0] = 1;
+            while(start == false);
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += sender.send(clientip, 30001, data, 1000, false);
+                data[0]++;
+                if(data[0] == 0){
+                    data[0]++;
+                }
+            }
+            thread_1_done = true;
+        });
+        std::atomic<bool> thread_2_done;
+        thread_2_done = false;
+        std::thread sending_thread_2 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            data[3] = 1;
+            while(start == false);
+            while(bytes_sent < TEST_SIZE){
+                data[4] = rand()%256;
+                data[5] = data[3] ^ data[4];
+                bytes_sent += sender.send(clientip, 30001, data, 1000, false);
+                data[3]++;
+                if(data[3] == 0){
+                    data[3]++;
+                }
+            }
+            thread_2_done = true;
+        });
+        std::atomic<bool> thread_3_done;
+        thread_3_done = false;
+        std::thread sending_thread_3 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            data[6] = 1;
+            start = true;
+            while(bytes_sent < TEST_SIZE){
+                data[7] = rand()%256;
+                data[8] = data[6] ^ data[7];
+                bytes_sent += sender.send(clientip, 30001, data, 1000, false);
+                data[6]++;
+                if(data[6] == 0){
+                    data[6]++;
+                }
+            }
+            thread_3_done = true;
+        });
+        sending_thread_1.detach();
+        sending_thread_2.detach();
+        sending_thread_3.detach();
+        while((thread_1_done == false) || (thread_2_done == false) || (thread_3_done == false));
+        std::cout<<"Test2 is passed\n";
+    }
+    //////////////////////////////////////////////////////////
+    // Test3: Multiple senders send packets to one receiver. Each sender uses different block size.
+    {
+        unsigned int clientip = 0;
+        ((unsigned char*)&clientip)[3] = 127;
+        ((unsigned char*)&clientip)[2] = 0;
+        ((unsigned char*)&clientip)[1] = 0;
+        ((unsigned char*)&clientip)[0] = 1;
+
+        ncsocket sender_1(30000, 500, 500, nullptr);
+        ncsocket sender_2(30001, 500, 500, nullptr);
+        ncsocket sender_3(30002, 500, 500, nullptr);
+        ncsocket receiver(30003, 500, 500, rx_callback_test3);
+        if(sender_1.open_session(clientip, 30003, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        if(sender_2.open_session(clientip, 30003, BLOCK_SIZE::SIZE4, 0) == false)
+        {
+            exit(-1);
+        }
+        if(sender_3.open_session(clientip, 30003, BLOCK_SIZE::SIZE2, 0) == false)
+        {
+            exit(-1);
+        }
+        std::atomic<bool> start;
+        start = false;
+        std::atomic<bool> sender_1_done;
+        sender_1_done = false;
+        const unsigned int TEST_SIZE = 100000000;
+        std::thread sending_thread_1 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            while(start == false);
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += sender_1.send(clientip, 30003, data, 1000, false);
+                data[0]++;
+            }
+            sender_1_done = true;
+        });
+        std::atomic<bool> sender_2_done;
+        sender_2_done = false;
+        std::thread sending_thread_2 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            while(start == false);
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += sender_2.send(clientip, 30003, data, 1000, false);
+                data[0]++;
+            }
+            sender_2_done = true;
+        });
+        std::atomic<bool> sender_3_done;
+        sender_3_done = false;
+        std::thread sending_thread_3 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            start = true;
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += sender_3.send(clientip, 30003, data, 1000, false);
+                data[0]++;
+            }
+            sender_3_done = true;
+        });
+        sending_thread_1.detach();
+        sending_thread_2.detach();
+        sending_thread_3.detach();
+        while(sender_1_done == false || sender_2_done == false || sender_3_done == false);
+        std::cout<<"Test3 is passed\n";
+    }
+    // Test4: One sender sends packets to multiple receivers.
+    {
+        unsigned int clientip = 0;
+        ((unsigned char*)&clientip)[3] = 127;
+        ((unsigned char*)&clientip)[2] = 0;
+        ((unsigned char*)&clientip)[1] = 0;
+        ((unsigned char*)&clientip)[0] = 1;
+
+        ncsocket sender(30000, 500, 500, nullptr);
+        ncsocket receiver_1(30001, 500, 500, rx_callback_test4_1);
+        ncsocket receiver_2(30002, 500, 500, rx_callback_test4_2);
+        ncsocket receiver_3(30003, 500, 500, rx_callback_test4_3);
+        if(sender.open_session(clientip, 30001, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        if(sender.open_session(clientip, 30002, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        if(sender.open_session(clientip, 30003, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        const unsigned int TEST_SIZE = 300000000;
+        std::thread sending_thread = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += sender.send(clientip, 30001, data, 1000, false);
+                bytes_sent += sender.send(clientip, 30002, data, 1000, false);
+                bytes_sent += sender.send(clientip, 30003, data, 1000, false);
+                data[0]++;
+            }
+        });
+        sending_thread.join();
+        std::cout<<"Test4 is passed\n";
+    }
+    // Test5: One sender running multi threads sends packets to multiple receivers.
+    {
+        unsigned int clientip = 0;
+        ((unsigned char*)&clientip)[3] = 127;
+        ((unsigned char*)&clientip)[2] = 0;
+        ((unsigned char*)&clientip)[1] = 0;
+        ((unsigned char*)&clientip)[0] = 1;
+
+        ncsocket sender(30000, 500, 500, nullptr);
+        ncsocket receiver_1(30001, 500, 500, rx_callback_test4_1);
+        ncsocket receiver_2(30002, 500, 500, rx_callback_test4_2);
+        ncsocket receiver_3(30003, 500, 500, rx_callback_test4_3);
+        if(sender.open_session(clientip, 30001, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        if(sender.open_session(clientip, 30002, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        if(sender.open_session(clientip, 30003, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        const unsigned int TEST_SIZE = 100000000;
+        std::atomic<bool> thread_1_done;
+        thread_1_done = false;
+        std::thread sending_thread_1 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += sender.send(clientip, 30001, data, 1000, false);
+                data[0]++;
+            }
+            thread_1_done = true;
+        });
+        std::atomic<bool> thread_2_done;
+        thread_2_done = false;
+        std::thread sending_thread_2 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += sender.send(clientip, 30002, data, 1000, false);
+                data[0]++;
+            }
+            thread_2_done = true;
+        });
+        std::atomic<bool> thread_3_done;
+        thread_3_done = false;
+        std::thread sending_thread_3 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += sender.send(clientip, 30003, data, 1000, false);
+                data[0]++;
+            }
+            thread_3_done = true;
+        });
+        sending_thread_1.detach();
+        sending_thread_2.detach();
+        sending_thread_3.detach();
+        while((thread_1_done == false) || (thread_2_done == false) || (thread_3_done == false));
+        std::cout<<"Test5 is passed\n";
     }
     return 0;
 }

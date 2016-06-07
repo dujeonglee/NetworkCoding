@@ -7,7 +7,7 @@ OBJECTS  := $(SOURCES:.cpp=.o)
 LIBRARY := -lpthread
 CPP := g++
 #CPP := arm-linux-gnueabihf-g++
-TARGET = server
+TARGET = test
 
 all : debug
 
@@ -22,9 +22,7 @@ clean :
 
 debug : CPPFLAGS := -g -pg -c -Wall -std=c++11 -fopenmp -DRANDOM_PKT_LOSS
 debug : $(TARGET)
-	cp $(TARGET) client
 
 release : CPPFLAGS := -O0 -c -Wall -std=c++11 -fopenmp
 release : $(TARGET)
-	cp $(TARGET) client
 
