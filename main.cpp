@@ -89,7 +89,7 @@ unsigned int bytes_received_test4[3] = {0,0,0};
 void rx_callback_test4_1(unsigned char* buffer, unsigned int size, sockaddr_in addr){
     bytes_received_test4[0] += size;
     if(seq_test4[0] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
-        printf("Something is wrong2: Expect %hhu but get %hhu\n", seq_test4[0], buffer[0]);
+        printf("Something is wrong1: Expect %hhu but get %hhu\n", seq_test4[0], buffer[0]);
         exit(-1);
     }
     seq_test4[0]++;
@@ -107,7 +107,7 @@ void rx_callback_test4_2(unsigned char* buffer, unsigned int size, sockaddr_in a
 void rx_callback_test4_3(unsigned char* buffer, unsigned int size, sockaddr_in addr){
     bytes_received_test4[2] += size;
     if(seq_test4[2] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
-        printf("Something is wrong2: Expect %hhu but get %hhu\n", seq_test4[2], buffer[0]);
+        printf("Something is wrong3: Expect %hhu but get %hhu\n", seq_test4[2], buffer[0]);
         exit(-1);
     }
     seq_test4[2]++;
@@ -338,6 +338,8 @@ int main(int argc, char* argv[])
     }
     // Test5: One sender running multi threads sends packets to multiple receivers.
     {
+        memset(seq_test4, 0, sizeof(seq_test4));
+        memset(bytes_received_test4, 0, sizeof(bytes_received_test4));
         unsigned int clientip = 0;
         ((unsigned char*)&clientip)[3] = 127;
         ((unsigned char*)&clientip)[2] = 0;

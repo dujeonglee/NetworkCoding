@@ -45,8 +45,8 @@ ncsocket::ncsocket(unsigned short int port, unsigned int tx_timeout_milli, unsig
         _socket = -1;
         return;
     }
-    _ncserver = new ncserver(_socket);
-    _ncclient = new ncclient(_socket, rx);
+    _nc_tx = new nctx(_socket);
+    _nc_rx = new ncrx(_socket, rx);
     _is_rx_thread_running = true;
     _rx_thread =  std::thread([&](){
         while(_is_rx_thread_running)
@@ -58,8 +58,8 @@ ncsocket::ncsocket(unsigned short int port, unsigned int tx_timeout_milli, unsig
             {
                 continue;
             }
-            _ncserver->_rx_handler(_rx_buffer, (unsigned int)ret, &sender_addr, sender_addr_length);
-            _ncclient->_rx_handler(_rx_buffer, (unsigned int)ret, &sender_addr, sender_addr_length);
+            _nc_tx->_rx_handler(_rx_buffer, (unsigned int)ret, &sender_addr, sender_addr_length);
+            _nc_rx->_rx_handler(_rx_buffer, (unsigned int)ret, &sender_addr, sender_addr_length);
         }
     });
     _state = ncsocket::STATE::INIT_SUCCESS;
@@ -69,22 +69,22 @@ ncsocket::~ncsocket()
 {
     _is_rx_thread_running = false;
     _rx_thread.join();
-    delete _ncserver;
-    delete _ncclient;
+    delete _nc_tx;
+    delete _nc_rx;
     close(_socket);
 }
 
 bool ncsocket::open_session(unsigned int ip, unsigned short int port, BLOCK_SIZE block_size, unsigned int timeout)
 {
-    return _ncserver->open_session(ip, port, block_size, timeout);
+    return _nc_tx->open_session(ip, port, block_size, timeout);
 }
 
 void ncsocket::close_session(unsigned int ip, unsigned short int port)
 {
-    _ncserver->close_session(ip, port);
+    _nc_tx->close_session(ip, port);
 }
 
 int ncsocket::send(unsigned int ip, unsigned short int port, unsigned char* buff, unsigned int size, bool force_start_retransmission)
 {
-    return _ncserver->send(ip, port, buff, size, force_start_retransmission);
+    return _nc_tx->send(ip, port, buff, size, force_start_retransmission);
 }

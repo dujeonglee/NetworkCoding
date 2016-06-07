@@ -3,8 +3,8 @@
 #include <atomic>
 #include <thread>
 #include "networkcodingheader.h"
-#include "ncserver.h"
-#include "ncclient.h"
+#include "nctx.h"
+#include "ncrx.h"
 
 class ncsocket{
 public:
@@ -17,8 +17,8 @@ private:
     };
     STATE _state;
     int _socket;
-    ncserver* _ncserver;
-    ncclient* _ncclient;
+    nctx* _nc_tx;
+    ncrx* _nc_rx;
     std::atomic<bool> _is_rx_thread_running;
     std::thread _rx_thread;
     unsigned char _rx_buffer[ETHERNET_MTU];
