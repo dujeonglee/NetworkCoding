@@ -15,7 +15,8 @@
   - Full-duplex communication
 
 # TODO
-  - Session control (open / close) implementation
+  - 3-way handshaking implementation
+  - Congestion control for retransmission.
   - Extention to multicast transmission.
 
 #Example
