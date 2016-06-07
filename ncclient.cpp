@@ -660,7 +660,6 @@ void ncclient::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in
         return;
     }
     const unsigned short int blk_seq = GET_OUTER_BLK_SEQ(_rx_buffer);
-    session_info->_lock.lock();
     /*
      * A change on a block sequence number indicates start of new block.
      * We need to flush rx buffers.
@@ -701,5 +700,4 @@ void ncclient::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in
             std::cout<<"Could not send ack\n";
         }
     }
-    session_info->_lock.unlock();
 }

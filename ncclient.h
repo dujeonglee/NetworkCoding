@@ -87,10 +87,6 @@ public:
      */
     unsigned char _losses;
     /**
-     * @brief _lock: For multi-thread environment
-     */
-    std::mutex _lock;
-    /**
      * @brief server_session_info: Constructor of server_session_info
      * @param addr: remote host's address (host byte order)
      * @param blk_size: The value for "_MAX_BLOCK_SIZE"

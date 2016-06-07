@@ -49,7 +49,7 @@ do\
 struct InnerHeader
 {
     unsigned short int size;          /*2*/
-	unsigned char last_indicator;	/*1*/
+    unsigned char last_indicator;	/*1*/
     unsigned char codes[1];        /*blk_size*/
 }__attribute__((packed));
 
@@ -73,7 +73,7 @@ do\
     {\
         for(unsigned char _tmp3 = 0 ; _tmp3 < max_block_size ; _tmp3++)\
         {\
-        printf("%4hhu", GET_INNER_CODE(buf[_tmp2].buffer)[_tmp3]);\
+            printf("%4hhu", GET_INNER_CODE(buf[_tmp2].buffer)[_tmp3]);\
         }\
         printf("\n");\
     }\
