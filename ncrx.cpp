@@ -153,10 +153,7 @@ bool ncrx::_handle_original_packet(rx_session_info* const session_info, const un
             send_ack = true;
         }
     }
-    if(send_ack == false)
-    {
-        session_info->_rank++;
-    }
+    session_info->_rank++;
     return send_ack;
 }
 
@@ -209,6 +206,7 @@ int ncrx::_innovative(rx_session_info * const session_info, unsigned char* pkt)
         session_info->_decoding_matrix[innovative_index].empty = true;
         memset(session_info->_decoding_matrix[innovative_index].encode, 0x0, session_info->_MAX_BLOCK_SIZE);
         memset(session_info->_decoding_matrix[innovative_index].decode, 0x0, session_info->_MAX_BLOCK_SIZE);
+        session_info->_decoding_matrix[innovative_index].decode[innovative_index] = 1;
         return -1;
     }
 
@@ -618,7 +616,7 @@ ncrx::~ncrx()
     });
     _server_session_info.clear();
 }
-
+unsigned int rx_until_ack = 0;
 void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* sender_addr, unsigned int sender_addr_len)
 {
     if(GET_OUTER_TYPE(buffer) != NC_PKT_TYPE::DATA_TYPE)
@@ -629,7 +627,7 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
     {
         return;
     }
-
+    rx_until_ack++;
     unsigned char* const _rx_buffer = buffer;
 
     const ip_port_key key = {sender_addr->sin_addr.s_addr, sender_addr->sin_port};
@@ -691,6 +689,7 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
     }
     if(send_ack)
     {
+        rx_until_ack = 0;
         Ack ack_pkt;
         ack_pkt.type = NC_PKT_TYPE::ACK_TYPE;
         ack_pkt.blk_seq = session_info->_blk_seq;
