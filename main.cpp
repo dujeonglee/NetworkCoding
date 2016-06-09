@@ -113,6 +113,32 @@ void rx_callback_test4_3(unsigned char* buffer, unsigned int size, sockaddr_in a
     seq_test4[2]++;
 }
 
+unsigned char seq_test6[2] = {0,};
+unsigned int bytes_received_test6[2] = {0,};
+void rx_callback_test6_1(unsigned char* buffer, unsigned int size, sockaddr_in addr){
+    bytes_received_test6[0] += size;
+    if(seq_test6[0] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
+        printf("Something is wrong1: Expect %hhu but get %hhu\n", seq_test6[0], buffer[0]);
+        exit(-1);
+    }
+    if((bytes_received_test6[0] % 1000000) == 0){
+        printf("[%s]Rx %u MB\n", __func__, bytes_received_test6[0]/1000000);
+    }
+    seq_test6[0]++;
+}
+
+void rx_callback_test6_2(unsigned char* buffer, unsigned int size, sockaddr_in addr){
+    bytes_received_test6[1] += size;
+    if(seq_test6[1] != buffer[0] || buffer[2] != (buffer[0] ^ buffer[1])){
+        printf("Something is wrong2: Expect %hhu but get %hhu\n", seq_test6[1], buffer[0]);
+        exit(-1);
+    }
+    if((bytes_received_test6[1] % 1000000) == 0){
+        printf("[%s]Rx %u MB\n", __func__, bytes_received_test6[1]/1000000);
+    }
+    seq_test6[1]++;
+}
+
 int main(int argc, char* argv[])
 {
     // Test1 One sender sends packets to one receiver
@@ -407,6 +433,62 @@ int main(int argc, char* argv[])
         sending_thread_3.detach();
         while((thread_1_done == false) || (thread_2_done == false) || (thread_3_done == false));
         std::cout<<"Test5 is passed\n";
+    }
+    // Test6: Full duplex test
+    {
+        unsigned int clientip = 0;
+        ((unsigned char*)&clientip)[3] = 127;
+        ((unsigned char*)&clientip)[2] = 0;
+        ((unsigned char*)&clientip)[1] = 0;
+        ((unsigned char*)&clientip)[0] = 1;
+
+        ncsocket sender(30000, 500, 500, rx_callback_test6_1);
+        ncsocket receiver(30001, 500, 500, rx_callback_test6_2);
+        if(sender.open_session(clientip, 30001, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        if(receiver.open_session(clientip, 30000, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        const unsigned int TEST_SIZE = 100000000;
+        std::atomic<bool> start;
+        start = false;
+        std::atomic<bool> thread_1_done;
+        thread_1_done = false;
+        std::thread sending_thread_1 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            data[0] = 0;
+            while(start == false);
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += sender.send(clientip, 30001, data, 1000, false);
+                data[0]++;
+            }
+            thread_1_done = true;
+        });
+        std::atomic<bool> thread_2_done;
+        thread_2_done = false;
+        std::thread sending_thread_2 = std::thread([&](){
+            unsigned int bytes_sent = 0;
+            unsigned char data[1000] = {0};
+            data[0] = 0;
+            start = true;
+            while(bytes_sent < TEST_SIZE){
+                data[1] = rand()%256;
+                data[2] = data[0] ^ data[1];
+                bytes_sent += receiver.send(clientip, 30000, data, 1000, false);
+                data[0]++;
+            }
+            thread_2_done = true;
+        });
+        sending_thread_1.detach();
+        sending_thread_2.detach();
+        while((thread_1_done == false) || (thread_2_done == false));
+        std::cout<<"Test6 is passed\n";
     }
     return 0;
 }
