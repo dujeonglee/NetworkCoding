@@ -19,6 +19,7 @@
   - 3-way handshaking implementation
   - Congestion control for retransmission.
   - Extention to multicast transmission.
+  - Change network coding session parameters, e.g., block size, redundancy, retransmission interval, and etc, after "open_session"
 
 #Example
 ```C++
