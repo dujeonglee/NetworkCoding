@@ -74,9 +74,9 @@ ncsocket::~ncsocket()
     close(_socket);
 }
 
-bool ncsocket::open_session(unsigned int ip, unsigned short int port, BLOCK_SIZE block_size, unsigned int timeout)
+bool ncsocket::open_session(unsigned int ip, unsigned short int port, BLOCK_SIZE block_size, unsigned int timeout, unsigned char redundancy)
 {
-    return _nc_tx->open_session(ip, port, block_size, timeout);
+    return _nc_tx->open_session(ip, port, block_size, timeout, redundancy);
 }
 
 void ncsocket::close_session(unsigned int ip, unsigned short int port)

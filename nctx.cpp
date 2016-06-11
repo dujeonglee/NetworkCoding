@@ -1,4 +1,5 @@
 #include "nctx.h"
+#include <time.h>
 
 extern sockaddr_in addr(unsigned int ip, unsigned short int port);
 
@@ -11,7 +12,7 @@ nctx::~nctx()
     });
 }
 
-tx_session_info::tx_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout):\
+tx_session_info::tx_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout, unsigned char redundancy):\
     _DATA_ADDR(addr(client_ip, cport)), _MAX_BLOCK_SIZE(block_size), _TIMEOUT(timeout) {
     _state = tx_session_info::STATE::INIT_FAILURE;
     try{
@@ -31,6 +32,7 @@ tx_session_info::tx_session_info(unsigned int client_ip, unsigned short int cpor
     _largest_pkt_size = 0;
     _blk_seq = 0;
     _loss_rate = 0.;
+    _redundancy = redundancy;
     _retransmission_in_progress = false;
     _state = tx_session_info::STATE::INIT_SUCCESS;
 }
@@ -73,6 +75,10 @@ bool nctx::_send_remedy_pkt(tx_session_info * const info)
     GET_OUTER_BLK_SIZE(info->_remedy_pkt.buffer) = info->_tx_cnt;
     GET_OUTER_MAX_BLK_SIZE(info->_remedy_pkt.buffer) = info->_MAX_BLOCK_SIZE;
     GET_OUTER_FLAGS(info->_remedy_pkt.buffer) = OuterHeader::FLAGS_END_OF_BLK;
+    if(info->_retransmission_in_progress == false)
+    {
+        return false;
+    }
     // Encode packets.
     for(unsigned int packet_id = 0 ; packet_id <= info->_tx_cnt ; packet_id++)
     {
@@ -91,7 +97,7 @@ bool nctx::_send_remedy_pkt(tx_session_info * const info)
     return ret;
 }
 
-bool nctx::open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout)
+bool nctx::open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout, unsigned char redundancy)
 {
     tx_session_info* new_tx_session_info = nullptr;
     const ip_port_key key = {client_ip, cport};
@@ -99,7 +105,7 @@ bool nctx::open_session(unsigned int client_ip, unsigned short int cport, BLOCK_
     {
         try
         {
-            new_tx_session_info = new tx_session_info(client_ip, cport, block_size, timeout);
+            new_tx_session_info = new tx_session_info(client_ip, cport, block_size, timeout, redundancy);
         }
         catch(std::exception ex)
         {
@@ -172,7 +178,9 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
     GET_OUTER_MAX_BLK_SIZE(pkt_buffer) = (*session)->_MAX_BLOCK_SIZE;
     GET_OUTER_FLAGS(pkt_buffer) = OuterHeader::FLAGS_ORIGINAL;
     GET_OUTER_FLAGS(pkt_buffer)  = (invoke_retransmission?GET_OUTER_FLAGS(pkt_buffer) | OuterHeader::FLAGS_END_OF_BLK:GET_OUTER_FLAGS(pkt_buffer));
-    const float loss_rate = (invoke_retransmission?(unsigned char)(*session)->_loss_rate:0);
+    const unsigned char loss_rate = ((*session)->_redundancy.load()==0xff?(invoke_retransmission?(*session)->_loss_rate.load()+1:(unsigned char)0)
+                                                         :
+                                                         (*session)->_redundancy.load());
     (*session)->_retransmission_in_progress = (invoke_retransmission?true:false);
 
     // Fill inner header
@@ -190,14 +198,24 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
     sendto(_SOCKET, pkt_buffer, GET_OUTER_SIZE(pkt_buffer), 0, (sockaddr*)&(*session)->_DATA_ADDR, sizeof((*session)->_DATA_ADDR));
     if(invoke_retransmission)
     {
-        for(unsigned char i = 0 ; i < loss_rate+1 ; i++)
+        clock_t sent_time = 0;
+        clock_t current_time = 0;
+        for(unsigned char i = 0 ; i < loss_rate ; i++)
         {
             _send_remedy_pkt((*session));
         }
-        while((*session)->_retransmission_in_progress)
+        /**
+         * _redundancy: =0xff: Reliable transmission
+         *                         <0xff: Best effort transmission.
+         */
+        while((*session)->_redundancy == 0xff && (*session)->_retransmission_in_progress.load())
         {
-            _send_remedy_pkt((*session));
-            std::this_thread::sleep_for (std::chrono::milliseconds((*session)->_TIMEOUT));
+            current_time = clock();
+            if((current_time - sent_time)/(CLOCKS_PER_SEC/1000) > (*session)->_TIMEOUT)
+            {
+                _send_remedy_pkt((*session));
+                sent_time = current_time;
+            }
         }
         unsigned short next_blk_seq = 0;
         do
@@ -234,7 +252,7 @@ void nctx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
         if(ack->blk_seq == (*session)->_blk_seq)
         {
             (*session)->_retransmission_in_progress = false;
-            (*session)->_loss_rate = ((*session)->_loss_rate + (float)ack->losses)/2.;
+            (*session)->_loss_rate = ((*session)->_loss_rate + ack->losses)/2;
         }
         else
         {

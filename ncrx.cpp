@@ -616,6 +616,7 @@ ncrx::~ncrx()
     });
     _server_session_info.clear();
 }
+
 void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* sender_addr, unsigned int sender_addr_len)
 {
     if(GET_OUTER_TYPE(buffer) != NC_PKT_TYPE::DATA_TYPE)
@@ -624,7 +625,7 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
     }
     if(rand()%10 == 0)
     {
-        //return;
+        return;
     }
     unsigned char* const _rx_buffer = buffer;
 
@@ -662,7 +663,18 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
      */
     if(session_info->_blk_seq != blk_seq)
     {
-        //printf("=======New Block=======\n");
+        //printf("New Block\n");
+        for(int i = 0 ; i < session_info->_MAX_BLOCK_SIZE ; i++)
+        {
+            if(session_info->_buffer[i].delivered == false && session_info->_decoding_matrix[i].empty == false && (GET_OUTER_FLAGS(session_info->_buffer[i].pkt.buffer) & OuterHeader::FLAGS_ORIGINAL) > 0)
+            {
+                if(_receive_callback != nullptr)
+                {
+                    _receive_callback(GET_INNER_PAYLOAD(session_info->_buffer[i].pkt.buffer, session_info->_MAX_BLOCK_SIZE), GET_INNER_SIZE(session_info->_buffer[i].pkt.buffer), session_info->_ADDR);
+                    session_info->_buffer[i].delivered = true;
+                }
+            }
+        }
         session_info->_rank = 0;
         session_info->_blk_seq = blk_seq;
         session_info->_losses = 0;

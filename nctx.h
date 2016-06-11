@@ -78,7 +78,12 @@ private:
      * @brief _loss_rate: The number of remedy packets in the previous block.
      * The nc server will send this many remedy packets before waiting for an ack from the client.
      */
-    std::atomic<float> _loss_rate;
+    std::atomic<unsigned char> _loss_rate;
+    /**
+     * @brief _redundancy: =0xff: Reliable transmission
+     *                                    <0xff: Best effort transmission.
+     */
+    std::atomic<unsigned char> _redundancy;
     /**
      * @brief _retransmission_in_progress: Indicate if retransmission is in progress for the client.
      * It will be true until an ack is received from the client.
@@ -96,7 +101,7 @@ private:
      * @param cport: Client's port number (host byte order)
      * @param block_size: Maximum block size.
      */
-    tx_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout);
+    tx_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout, unsigned char redundancy);
     /**
      * @brief ~tx_session_info: Destructor of client session information
      */
@@ -141,7 +146,7 @@ private:
      * @param block_size: Maximum block size chosen from BLOCK_SIZE
      * @return: On success true. Otherwise, false
      */
-    bool open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout);
+    bool open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout, unsigned char redundancy);
     /**
      * @brief close_session: Close a client session.
      * @param client_ip: Client ip address that you want to close (host byte order)
