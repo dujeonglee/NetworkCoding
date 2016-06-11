@@ -79,6 +79,11 @@ bool ncsocket::open_session(unsigned int ip, unsigned short int port, BLOCK_SIZE
     return _nc_tx->open_session(ip, port, block_size, timeout, redundancy);
 }
 
+bool ncsocket::connect_session(unsigned int client_ip, unsigned short int cport, unsigned char probes, unsigned int timeout)
+{
+    return _nc_tx->connect_session(client_ip, cport, probes, timeout);
+}
+
 void ncsocket::close_session(unsigned int ip, unsigned short int port)
 {
     _nc_tx->close_session(ip, port);

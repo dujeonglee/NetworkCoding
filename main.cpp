@@ -567,9 +567,42 @@ int main(int argc, char* argv[])
         sending_thread_1.detach();
         sending_thread_2.detach();
         while((thread_1_done == false) || (thread_2_done == false));
-        printf("Received %u %u\n", bytes_received_test7[0], bytes_received_test7[1]);
         sleep(1);
         std::cout<<"Test7 is passed\n";
+    }
+    // Test 8 connection test
+    {
+        unsigned int clientip = 0;
+        ((unsigned char*)&clientip)[3] = 127;
+        ((unsigned char*)&clientip)[2] = 0;
+        ((unsigned char*)&clientip)[1] = 0;
+        ((unsigned char*)&clientip)[0] = 1;
+
+        ncsocket sender(30000, 500, 500, nullptr);
+        if(sender.open_session(clientip, 30001, BLOCK_SIZE::SIZE8, 0, 4) == false)
+        {
+            exit(-1);
+        }
+        if(sender.connect_session(clientip, 30001, 3, 500) == true)
+        {
+            std::cout<<"connection established\n";
+            exit(-1);
+        }
+        else
+        {
+            std::cout<<"connection is not established\n";
+        }
+        ncsocket receiver(30001, 500, 500, nullptr);
+        if(sender.connect_session(clientip, 30001, 3, 500) == true)
+        {
+            std::cout<<"connection established\n";
+        }
+        else
+        {
+            std::cout<<"connection is not established\n";
+            exit(-1);
+        }
+        std::cout<<"Test 8 is passed\n";
     }
     return 0;
 }

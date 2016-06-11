@@ -47,6 +47,7 @@ private:
      * @brief _TIMEOUT: Rx and Tx timeout value.
      */
     const unsigned int _TIMEOUT;
+    std::atomic<bool> _is_connected;
     /**
      * @brief _buffer: Packet buffer
      */
@@ -147,6 +148,15 @@ private:
      * @return: On success true. Otherwise, false
      */
     bool open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout, unsigned char redundancy);
+    /**
+     * @brief connect_session: Check if remote host is ready to receive packet.
+     * @param client_ip: Client ip address (host byte order)
+     * @param cport: Client port number (host byte order)
+     * @param probes: The number of probing packets for connectivity check.
+     * @param timeout: The maximum waiting time for a response from the client.
+     * @return: On success true. Otherwise, false
+     */
+    bool connect_session(unsigned int client_ip, unsigned short int cport, unsigned char probes, unsigned int timeout);
     /**
      * @brief close_session: Close a client session.
      * @param client_ip: Client ip address that you want to close (host byte order)

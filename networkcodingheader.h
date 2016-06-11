@@ -21,7 +21,9 @@
 
 enum NC_PKT_TYPE : unsigned char{
     DATA_TYPE = 0,
-    ACK_TYPE
+    ACK_TYPE,
+    REQ_CONNECT_TYPE,
+    REP_CONNECT_TYPE
 };
 
 struct OuterHeader
@@ -84,6 +86,11 @@ struct Ack
     unsigned char type;
     unsigned short int blk_seq;    /*2*/
     unsigned char losses;             /*1*/
+}__attribute__((packed));
+
+struct Connect
+{
+    unsigned char type;
 }__attribute__((packed));
 
 enum BLOCK_SIZE: unsigned char

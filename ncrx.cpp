@@ -619,93 +619,101 @@ ncrx::~ncrx()
 
 void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* sender_addr, unsigned int sender_addr_len)
 {
-    if(GET_OUTER_TYPE(buffer) != NC_PKT_TYPE::DATA_TYPE)
+    if(buffer[0] == NC_PKT_TYPE::DATA_TYPE)
     {
-        return;
-    }
-    if(rand()%10 == 0)
-    {
-        return;
-    }
-    unsigned char* const _rx_buffer = buffer;
+        if(rand()%10 == 0)
+        {
+            return;
+        }
+        unsigned char* const _rx_buffer = buffer;
 
-    const ip_port_key key = {sender_addr->sin_addr.s_addr, sender_addr->sin_port};
-    rx_session_info** const lookup_result = _server_session_info.find(key);
-    rx_session_info* session_info = nullptr;
-    if(lookup_result == nullptr)
-    {
-        try
+        const ip_port_key key = {sender_addr->sin_addr.s_addr, sender_addr->sin_port};
+        rx_session_info** const lookup_result = _server_session_info.find(key);
+        rx_session_info* session_info = nullptr;
+        if(lookup_result == nullptr)
         {
-            session_info = new rx_session_info((*sender_addr), GET_OUTER_MAX_BLK_SIZE(_rx_buffer));
-        }
-        catch(std::exception ex)
-        {
-            return;
-        }
-        if(session_info->_state == rx_session_info::STATE::INIT_FAILURE)
-        {
-            delete session_info;
-            return;
-        }
-        _server_session_info.insert(key, session_info);
-    }
-    else
-    {
-        session_info = (*lookup_result);
-    }
-    if(session_info->_state == rx_session_info::STATE::INIT_FAILURE){
-        return;
-    }
-    const unsigned short int blk_seq = GET_OUTER_BLK_SEQ(_rx_buffer);
-    /*
-     * A change on a block sequence number indicates start of new block.
-     * We need to flush rx buffers.
-     */
-    if(session_info->_blk_seq != blk_seq)
-    {
-        //printf("New Block\n");
-        for(int i = 0 ; i < session_info->_MAX_BLOCK_SIZE ; i++)
-        {
-            if(session_info->_buffer[i].delivered == false && session_info->_decoding_matrix[i].empty == false && (GET_OUTER_FLAGS(session_info->_buffer[i].pkt.buffer) & OuterHeader::FLAGS_ORIGINAL) > 0)
+            try
             {
-                if(_receive_callback != nullptr)
+                session_info = new rx_session_info((*sender_addr), GET_OUTER_MAX_BLK_SIZE(_rx_buffer));
+            }
+            catch(std::exception ex)
+            {
+                return;
+            }
+            if(session_info->_state == rx_session_info::STATE::INIT_FAILURE)
+            {
+                delete session_info;
+                return;
+            }
+            _server_session_info.insert(key, session_info);
+        }
+        else
+        {
+            session_info = (*lookup_result);
+        }
+        if(session_info->_state == rx_session_info::STATE::INIT_FAILURE){
+            return;
+        }
+        const unsigned short int blk_seq = GET_OUTER_BLK_SEQ(_rx_buffer);
+        /*
+         * A change on a block sequence number indicates start of new block.
+         * We need to flush rx buffers.
+         */
+        if(session_info->_blk_seq != blk_seq)
+        {
+            //printf("New Block\n");
+            for(int i = 0 ; i < session_info->_MAX_BLOCK_SIZE ; i++)
+            {
+                if(session_info->_buffer[i].delivered == false && session_info->_decoding_matrix[i].empty == false && (GET_OUTER_FLAGS(session_info->_buffer[i].pkt.buffer) & OuterHeader::FLAGS_ORIGINAL) > 0)
                 {
-                    _receive_callback(GET_INNER_PAYLOAD(session_info->_buffer[i].pkt.buffer, session_info->_MAX_BLOCK_SIZE), GET_INNER_SIZE(session_info->_buffer[i].pkt.buffer), session_info->_ADDR);
-                    session_info->_buffer[i].delivered = true;
+                    if(_receive_callback != nullptr)
+                    {
+                        _receive_callback(GET_INNER_PAYLOAD(session_info->_buffer[i].pkt.buffer, session_info->_MAX_BLOCK_SIZE), GET_INNER_SIZE(session_info->_buffer[i].pkt.buffer), session_info->_ADDR);
+                        session_info->_buffer[i].delivered = true;
+                    }
                 }
             }
+            session_info->_rank = 0;
+            session_info->_blk_seq = blk_seq;
+            session_info->_losses = 0;
+            for(int i = 0 ; i < session_info->_MAX_BLOCK_SIZE ; i++)
+            {
+                session_info->_buffer[i].delivered = false;
+                memset(session_info->_buffer[i].pkt.buffer, 0x0, TOTAL_HEADER_SIZE(session_info->_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(session_info->_MAX_BLOCK_SIZE));
+                session_info->_decoding_matrix[i].empty = true;
+                memset(session_info->_decoding_matrix[i].encode, 0x0, session_info->_MAX_BLOCK_SIZE);
+                memset(session_info->_decoding_matrix[i].decode, 0x0, session_info->_MAX_BLOCK_SIZE);
+                session_info->_decoding_matrix[i].decode[i] = 1;
+            }
         }
-        session_info->_rank = 0;
-        session_info->_blk_seq = blk_seq;
-        session_info->_losses = 0;
-        for(int i = 0 ; i < session_info->_MAX_BLOCK_SIZE ; i++)
+        bool send_ack = false;
+        if(GET_OUTER_FLAGS(_rx_buffer) & OuterHeader::FLAGS_ORIGINAL)
         {
-            session_info->_buffer[i].delivered = false;
-            memset(session_info->_buffer[i].pkt.buffer, 0x0, TOTAL_HEADER_SIZE(session_info->_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(session_info->_MAX_BLOCK_SIZE));
-            session_info->_decoding_matrix[i].empty = true;
-            memset(session_info->_decoding_matrix[i].encode, 0x0, session_info->_MAX_BLOCK_SIZE);
-            memset(session_info->_decoding_matrix[i].decode, 0x0, session_info->_MAX_BLOCK_SIZE);
-            session_info->_decoding_matrix[i].decode[i] = 1;
+            send_ack = _handle_original_packet(session_info, _rx_buffer, size);
+        }
+        else
+        {
+            send_ack = _handle_remedy_packet(session_info, _rx_buffer, size);
+        }
+        if(send_ack)
+        {
+            Ack ack_pkt;
+            ack_pkt.type = NC_PKT_TYPE::ACK_TYPE;
+            ack_pkt.blk_seq = session_info->_blk_seq;
+            ack_pkt.losses = session_info->_losses;
+            if(sizeof(Ack) != sendto(_SOCKET, (void*)&ack_pkt, sizeof(Ack), 0, (sockaddr*)sender_addr, sender_addr_len))
+            {
+                std::cout<<"Could not send ack\n";
+            }
         }
     }
-    bool send_ack = false;
-    if(GET_OUTER_FLAGS(_rx_buffer) & OuterHeader::FLAGS_ORIGINAL)
+    else if(buffer[0] == NC_PKT_TYPE::REQ_CONNECT_TYPE)
     {
-        send_ack = _handle_original_packet(session_info, _rx_buffer, size);
-    }
-    else
-    {
-        send_ack = _handle_remedy_packet(session_info, _rx_buffer, size);
-    }
-    if(send_ack)
-    {
-        Ack ack_pkt;
-        ack_pkt.type = NC_PKT_TYPE::ACK_TYPE;
-        ack_pkt.blk_seq = session_info->_blk_seq;
-        ack_pkt.losses = session_info->_losses;
-        if(sizeof(ack_pkt) != sendto(_SOCKET, (void*)&ack_pkt, sizeof(ack_pkt), 0, (sockaddr*)sender_addr, sender_addr_len))
+        Connect connect;
+        connect.type = NC_PKT_TYPE::REP_CONNECT_TYPE;
+        if(sizeof(Connect) != sendto(_SOCKET, (void*)&connect, sizeof(Connect), 0, (sockaddr*)sender_addr, sender_addr_len))
         {
-            std::cout<<"Could not send ack\n";
+            std::cout<<"Could not connection reply\n";
         }
     }
 }

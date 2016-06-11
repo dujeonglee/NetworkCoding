@@ -1,6 +1,7 @@
 #ifndef FINITE_FEILD
 #define FINITE_FEILD
 #include "design_pattern.h"
+#define INLINE_MUL_INV
 typedef unsigned char byte;
 
 class FiniteField{
@@ -27,14 +28,25 @@ public:
      * @brief sub: Subtracting "b" from "a"
      */
     byte sub(byte a, byte b);
+#ifdef INLINE_MUL_INV
     /**
      * @brief mul: Multiplying "a" and "b"
      */
-    byte mul(byte a, byte b);
+    inline byte mul(byte a, byte b){return _mul_table[a<b?a:b][a<b?b-a:a-b];}
+    /**
+     * @brief inv: Calculating inverse of "a"
+     */
+    inline byte inv(byte a){return _inv_table[a];}
+#else
+    /**
+     * @brief mul: Multiplying "a" and "b"
+     */
+    inline byte mul(byte a, byte b);
     /**
      * @brief inv: Calculating inverse of "a"
      */
     byte inv(byte a);
+#endif
 };
 
 #endif

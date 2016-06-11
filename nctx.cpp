@@ -101,7 +101,7 @@ bool nctx::open_session(unsigned int client_ip, unsigned short int cport, BLOCK_
 {
     tx_session_info* new_tx_session_info = nullptr;
     const ip_port_key key = {client_ip, cport};
-    if(_tx_session_info.find(key) == false)
+    if(_tx_session_info.find(key) == nullptr)
     {
         try
         {
@@ -123,6 +123,30 @@ bool nctx::open_session(unsigned int client_ip, unsigned short int cport, BLOCK_
         }
     }
     return true;
+}
+
+bool nctx::connect_session(unsigned int client_ip, unsigned short int cport, unsigned char probes, unsigned int to)
+{
+    const ip_port_key key = {client_ip, cport};
+    const clock_t timeout = clock() + to*(CLOCKS_PER_SEC/1000);
+
+    tx_session_info** const info = _tx_session_info.find(key);
+    if(info == nullptr)
+    {
+        return false;
+    }
+    (*info)->_is_connected = false;
+    for(unsigned char req = 0 ; req < probes ; req++)
+    {
+        Connect connect;
+        connect.type = NC_PKT_TYPE::REQ_CONNECT_TYPE;
+        if(sizeof(Connect) != sendto(_SOCKET, &connect, sizeof(Connect), 0, (sockaddr*)&(*info)->_DATA_ADDR, sizeof((*info)->_DATA_ADDR)))
+        {
+            std::cout<<"Could not send connection request\n";
+        }
+    }
+    while((*info)->_is_connected == false && clock() < timeout);
+    return (*info)->_is_connected;
 }
 
 void nctx::close_session(unsigned int client_ip, unsigned short int cport)
@@ -236,31 +260,39 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
 
 void nctx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* sender_addr, unsigned int sender_addr_len)
 {
-    Ack* const ack = (Ack*)buffer;
-    if(ack->type != NC_PKT_TYPE::ACK_TYPE)
+    if(buffer[0] == NC_PKT_TYPE::ACK_TYPE)
     {
-        return;
-    }
-    if(size != sizeof(Ack))
-    {
-        return;
-    }
-    const ip_port_key key = {ntohl(sender_addr->sin_addr.s_addr), ntohs(sender_addr->sin_port)};
-    tx_session_info** const session = _tx_session_info.find(key);
-    if(session != nullptr)
-    {
-        if(ack->blk_seq == (*session)->_blk_seq)
+        Ack* const ack = (Ack*)buffer;
+        if(size != sizeof(Ack))
         {
-            (*session)->_retransmission_in_progress = false;
-            (*session)->_loss_rate = ((*session)->_loss_rate + ack->losses)/2;
+            return;
+        }
+        const ip_port_key key = {ntohl(sender_addr->sin_addr.s_addr), ntohs(sender_addr->sin_port)};
+        tx_session_info** const session = _tx_session_info.find(key);
+        if(session != nullptr)
+        {
+            if(ack->blk_seq == (*session)->_blk_seq)
+            {
+                (*session)->_retransmission_in_progress = false;
+                (*session)->_loss_rate = ((*session)->_loss_rate + ack->losses)/2;
+            }
+            else
+            {
+                // Packets of new block sequence may be lost. We can ignore this packet.
+            }
         }
         else
         {
-            // Packets of new block sequence may be lost. We can ignore this packet.
+            // To Do: Deal with zombie client
         }
     }
-    else
+    else if(buffer[0] == NC_PKT_TYPE::REP_CONNECT_TYPE)
     {
-        // To Do: Deal with zombie client
+        const ip_port_key key = {ntohl(sender_addr->sin_addr.s_addr), ntohs(sender_addr->sin_port)};
+        tx_session_info** const session = _tx_session_info.find(key);
+        if(session)
+        {
+            (*session)->_is_connected = true;
+        }
     }
 }

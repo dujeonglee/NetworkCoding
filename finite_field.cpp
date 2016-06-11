@@ -70,7 +70,7 @@ byte FiniteField::sub(byte a, byte b)
 {
     return a ^ b;
 }
-
+#ifndef INLINE_MUL_INV
 byte FiniteField::mul(byte a, byte b)
 {
     return _mul_table[a<b?a:b][a<b?b-a:a-b];
@@ -80,4 +80,4 @@ byte FiniteField::inv(byte a)
 {
     return _inv_table[a];
 }
-
+#endif
