@@ -604,5 +604,58 @@ int main(int argc, char* argv[])
         }
         std::cout<<"Test 8 is passed\n";
     }
+    // Test 9 connection test
+    {
+        unsigned int clientip = 0;
+        ((unsigned char*)&clientip)[3] = 127;
+        ((unsigned char*)&clientip)[2] = 0;
+        ((unsigned char*)&clientip)[1] = 0;
+        ((unsigned char*)&clientip)[0] = 1;
+
+        ncsocket sender(30000, 500, 500, nullptr);
+        if(sender.open_session(clientip, 30001, BLOCK_SIZE::SIZE8, 0) == false)
+        {
+            exit(-1);
+        }
+        const unsigned int TEST_SIZE = 50000000;
+        std::atomic<bool> thread_1_done;
+        thread_1_done = false;
+        std::thread sending_thread_1 = std::thread([&](){
+            {
+                ncsocket receiver(30001, 500, 500, nullptr);
+                unsigned int bytes_sent = 0;
+                unsigned char data[1000] = {0};
+                data[0] = 0;
+                while(bytes_sent < TEST_SIZE){
+                    data[1] = rand()%256;
+                    data[2] = data[0] ^ data[1];
+                    bytes_sent += sender.send(clientip, 30001, data, 1000, false);
+                    data[0]++;
+                }
+            }
+            {
+                unsigned int bytes_sent = 0;
+                unsigned char data[1000] = {0};
+                data[0] = 0;
+                while(bytes_sent < TEST_SIZE){
+                    int ret=0;
+                    data[1] = rand()%256;
+                    data[2] = data[0] ^ data[1];
+                    bytes_sent += (ret = sender.send(clientip, 30001, data, 1000, false));
+                    if(ret == 0)
+                    {
+                        std::cout<<"Connection is lost\n";
+                        break;
+                    }
+                    data[0]++;
+                }
+            }
+            thread_1_done = true;
+        });
+        sending_thread_1.detach();
+        while((thread_1_done == false));
+        sleep(1);
+        std::cout<<"Test 9 is passed\n";
+    }
     return 0;
 }

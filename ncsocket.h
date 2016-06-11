@@ -27,7 +27,7 @@ public:
     bool open_session(unsigned int ip, unsigned short int port, BLOCK_SIZE block_size, unsigned int timeout, unsigned char redundancy = 0xff);
     bool connect_session(unsigned int client_ip, unsigned short int cport, unsigned char probes, unsigned int timeout);
     void close_session(unsigned int ip, unsigned short int port);
-    int send(unsigned int ip, unsigned short int port, unsigned char* buff, unsigned int size, bool force_start_retransmission);
+    int send(unsigned int ip, unsigned short int port, unsigned char* buff, unsigned int size, bool force_start_retransmission, unsigned int ack_timeout = 1000);
 };
 
 #endif

@@ -172,7 +172,7 @@ private:
      * @param complete_block: To force retransmission. (In the last transmission, "complete_block" must be true.)
      * @return: The number of bytes sent.
      */
-    unsigned short int send(unsigned int client_ip, unsigned short int cport, unsigned char* pkt, unsigned short int pkt_size, const bool complete_block);
+    unsigned short int send(unsigned int client_ip, unsigned short int cport, unsigned char* pkt, unsigned short int pkt_size, const bool complete_block, unsigned int ack_timeout);
     void _rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* sender_addr, unsigned int sender_addr_len);
 };
 

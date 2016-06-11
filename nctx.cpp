@@ -165,7 +165,7 @@ void nctx::close_session(unsigned int client_ip, unsigned short int cport)
  * pkt: Pointer for data.
  * pkt_size: Size of data.
  */
-unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, unsigned char* pkt, unsigned short int pkt_size, const bool complete_block)
+unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, unsigned char* pkt, unsigned short int pkt_size, const bool complete_block, const unsigned int ack_timeout)
 {
     const ip_port_key key = {client_ip, cport};
     tx_session_info** const session = _tx_session_info.find(key);
@@ -228,11 +228,12 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
         {
             _send_remedy_pkt((*session));
         }
+        const clock_t retransmission_timeout = clock() + (CLOCKS_PER_SEC/1000)*ack_timeout;
         /**
          * _redundancy: =0xff: Reliable transmission
          *                         <0xff: Best effort transmission.
          */
-        while((*session)->_redundancy == 0xff && (*session)->_retransmission_in_progress.load())
+        while((*session)->_redundancy == 0xff && (*session)->_retransmission_in_progress && clock() < retransmission_timeout)
         {
             current_time = clock();
             if((current_time - sent_time)/(CLOCKS_PER_SEC/1000) > (*session)->_TIMEOUT)
@@ -240,6 +241,11 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
                 _send_remedy_pkt((*session));
                 sent_time = current_time;
             }
+        }
+        if((*session)->_redundancy == 0xff && (*session)->_retransmission_in_progress)
+        {
+            (*session)->_lock.unlock();
+            return 0;
         }
         unsigned short next_blk_seq = 0;
         do
