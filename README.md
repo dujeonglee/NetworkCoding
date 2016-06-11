@@ -13,6 +13,7 @@
 # Done
   - Thread-safe
   - Full-duplex communication
+  - Unreliable transmission service with constant redundancy
 
 # TODO
   - 3-way handshaking implementation
