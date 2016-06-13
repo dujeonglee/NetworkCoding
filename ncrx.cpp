@@ -623,6 +623,7 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
     {
         if(rand()%10 == 0)
         {
+            // For test, introduce random packet loss of 10%.
             return;
         }
         unsigned char* const _rx_buffer = buffer;
@@ -649,6 +650,25 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
         }
         else
         {
+            if((*lookup_result)->_MAX_BLOCK_SIZE != GET_OUTER_MAX_BLK_SIZE(_rx_buffer))
+            {
+                rx_session_info* new_session_info = nullptr;
+                try
+                {
+                    new_session_info = new rx_session_info((*sender_addr), GET_OUTER_MAX_BLK_SIZE(_rx_buffer));
+                }
+                catch(std::exception ex)
+                {
+                    return;
+                }
+                if(session_info->_state == rx_session_info::STATE::INIT_FAILURE)
+                {
+                    delete new_session_info;
+                    return;
+                }
+                delete (*lookup_result);
+                (*lookup_result) = new_session_info;
+            }
             session_info = (*lookup_result);
         }
         if(session_info->_state == rx_session_info::STATE::INIT_FAILURE){
@@ -713,7 +733,7 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
         connect.type = NC_PKT_TYPE::REP_CONNECT_TYPE;
         if(sizeof(Connect) != sendto(_SOCKET, (void*)&connect, sizeof(Connect), 0, (sockaddr*)sender_addr, sender_addr_len))
         {
-            std::cout<<"Could not connection reply\n";
+            std::cout<<"Could not send connection reply\n";
         }
     }
 }

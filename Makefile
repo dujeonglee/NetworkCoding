@@ -18,11 +18,12 @@ $(TARGET) : $(OBJECTS)
 	$(CPP) $(SOURCES) $(CPPFLAGS) $(INCLUDES) $(LIBRARY)
 
 clean :
-	rm -rf $(OBJECTS) $(TARGET) *~ ./client
+	rm -rf $(OBJECTS) $(TARGET) *~ gmon.out
 
 debug : CPPFLAGS := -g -pg -c -Wall -std=c++11 -fopenmp -DRANDOM_PKT_LOSS
 debug : $(TARGET)
 
 release : CPPFLAGS := -O0 -c -Wall -std=c++11 -fopenmp
 release : $(TARGET)
-
+	./$(TARGET)
+	gprof ./$(TARGET) gmon.out

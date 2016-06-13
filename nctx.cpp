@@ -12,18 +12,18 @@ nctx::~nctx()
     });
 }
 
-tx_session_info::tx_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout, unsigned char redundancy):\
-    _DATA_ADDR(addr(client_ip, cport)), _MAX_BLOCK_SIZE(block_size), _TIMEOUT(timeout) {
+tx_session_info::tx_session_info(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int retransmission_interval, unsigned char redundancy):\
+    _DATA_ADDR(addr(client_ip, cport)), _max_block_size(block_size), _retransmission_interval(retransmission_interval) {
     _state = tx_session_info::STATE::INIT_FAILURE;
     try{
-        _buffer = new NetworkCodingPktBuffer [_MAX_BLOCK_SIZE];
+        _buffer = new NetworkCodingPktBuffer [_max_block_size];
     }catch(std::exception ex){
         _buffer = nullptr;
         return;
     }
 
     try{
-        _rand_coef = new unsigned char [_MAX_BLOCK_SIZE];
+        _rand_coef = new unsigned char [_max_block_size];
     }catch(std::exception ex){
         delete [] _buffer;
         return;
@@ -60,9 +60,9 @@ bool nctx::_send_remedy_pkt(tx_session_info * const info)
     {
         return (int)GET_OUTER_SIZE(info->_buffer[0].buffer) == sendto(_SOCKET, info->_buffer[0].buffer, GET_OUTER_SIZE(info->_buffer[0].buffer), 0, (sockaddr*)&info->_DATA_ADDR, sizeof(info->_DATA_ADDR));
     }
-    memset(info->_remedy_pkt.buffer, 0x0, TOTAL_HEADER_SIZE(info->_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(info->_MAX_BLOCK_SIZE));
+    memset(info->_remedy_pkt.buffer, 0x0, TOTAL_HEADER_SIZE(info->_max_block_size)+MAX_PAYLOAD_SIZE(info->_max_block_size));
     // Generate random cofficient.
-    for(unsigned int code_id = 0 ; code_id < info->_MAX_BLOCK_SIZE ; code_id++)
+    for(unsigned int code_id = 0 ; code_id < info->_max_block_size ; code_id++)
     {
         // I want all packets are encoded for remedy pkts, i.e. coefficients are greater than 0.
         info->_rand_coef[code_id] = code_id <= info->_tx_cnt?1+rand()%255:0;
@@ -70,10 +70,10 @@ bool nctx::_send_remedy_pkt(tx_session_info * const info)
 
     // Fill-in header information
     GET_OUTER_TYPE(info->_remedy_pkt.buffer) = NC_PKT_TYPE::DATA_TYPE;
-    GET_OUTER_SIZE(info->_remedy_pkt.buffer) = TOTAL_HEADER_SIZE(info->_MAX_BLOCK_SIZE)+info->_largest_pkt_size;
+    GET_OUTER_SIZE(info->_remedy_pkt.buffer) = TOTAL_HEADER_SIZE(info->_max_block_size)+info->_largest_pkt_size;
     GET_OUTER_BLK_SEQ(info->_remedy_pkt.buffer) = info->_blk_seq;
     GET_OUTER_BLK_SIZE(info->_remedy_pkt.buffer) = info->_tx_cnt;
-    GET_OUTER_MAX_BLK_SIZE(info->_remedy_pkt.buffer) = info->_MAX_BLOCK_SIZE;
+    GET_OUTER_MAX_BLK_SIZE(info->_remedy_pkt.buffer) = info->_max_block_size;
     GET_OUTER_FLAGS(info->_remedy_pkt.buffer) = OuterHeader::FLAGS_END_OF_BLK;
     if(info->_retransmission_in_progress == false)
     {
@@ -97,7 +97,7 @@ bool nctx::_send_remedy_pkt(tx_session_info * const info)
     return ret;
 }
 
-bool nctx::open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int timeout, unsigned char redundancy)
+bool nctx::open_session(unsigned int client_ip, unsigned short int cport, BLOCK_SIZE block_size, unsigned int retransmission_interval, unsigned char redundancy)
 {
     tx_session_info* new_tx_session_info = nullptr;
     const ip_port_key key = {client_ip, cport};
@@ -105,7 +105,7 @@ bool nctx::open_session(unsigned int client_ip, unsigned short int cport, BLOCK_
     {
         try
         {
-            new_tx_session_info = new tx_session_info(client_ip, cport, block_size, timeout, redundancy);
+            new_tx_session_info = new tx_session_info(client_ip, cport, block_size, retransmission_interval, redundancy);
         }
         catch(std::exception ex)
         {
@@ -165,7 +165,7 @@ void nctx::close_session(unsigned int client_ip, unsigned short int cport)
  * pkt: Pointer for data.
  * pkt_size: Size of data.
  */
-unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, unsigned char* pkt, unsigned short int pkt_size, const bool complete_block, const unsigned int ack_timeout)
+unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, unsigned char* pkt, unsigned short int pkt_size, const bool complete_block, const unsigned int ack_timeout, tx_session_param* new_param)
 {
     const ip_port_key key = {client_ip, cport};
     tx_session_info** const session = _tx_session_info.find(key);
@@ -173,11 +173,12 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
     {
         return 0;
     }
+    (*session)->_lock.lock();
     if((*session)->_state == tx_session_info::STATE::INIT_FAILURE)
     {
         return 0;
     }
-    if(pkt_size > MAX_PAYLOAD_SIZE((*session)->_MAX_BLOCK_SIZE))
+    if(pkt_size > MAX_PAYLOAD_SIZE((*session)->_max_block_size))
     {
         // A single packet size is limitted to MAX_PAYLOAD_SIZE for the simplicity.
         // Support of large data packet is my future work.
@@ -191,15 +192,17 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
         (*session)->_largest_pkt_size = pkt_size;
     }
     // Fill outer header
-    (*session)->_lock.lock();
     const unsigned char* pkt_buffer = (*session)->_buffer[(*session)->_tx_cnt].buffer;
-    const bool invoke_retransmission = ((*session)->_tx_cnt == (*session)->_MAX_BLOCK_SIZE - 1) || (complete_block == true);
+    const bool invoke_retransmission = \
+            ((*session)->_tx_cnt == (*session)->_max_block_size - 1) || \
+            (complete_block == true) || \
+            (new_param!=nullptr);
 
     GET_OUTER_TYPE(pkt_buffer) = NC_PKT_TYPE::DATA_TYPE;
-    GET_OUTER_SIZE(pkt_buffer) = TOTAL_HEADER_SIZE((*session)->_MAX_BLOCK_SIZE)+pkt_size;
+    GET_OUTER_SIZE(pkt_buffer) = TOTAL_HEADER_SIZE((*session)->_max_block_size)+pkt_size;
     GET_OUTER_BLK_SEQ(pkt_buffer) = (*session)->_blk_seq;
     GET_OUTER_BLK_SIZE(pkt_buffer) = (*session)->_tx_cnt;
-    GET_OUTER_MAX_BLK_SIZE(pkt_buffer) = (*session)->_MAX_BLOCK_SIZE;
+    GET_OUTER_MAX_BLK_SIZE(pkt_buffer) = (*session)->_max_block_size;
     GET_OUTER_FLAGS(pkt_buffer) = OuterHeader::FLAGS_ORIGINAL;
     GET_OUTER_FLAGS(pkt_buffer)  = (invoke_retransmission?GET_OUTER_FLAGS(pkt_buffer) | OuterHeader::FLAGS_END_OF_BLK:GET_OUTER_FLAGS(pkt_buffer));
     const unsigned char loss_rate = ((*session)->_redundancy.load()==0xff?(invoke_retransmission?(*session)->_loss_rate.load()+1:(unsigned char)0)
@@ -210,11 +213,11 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
     // Fill inner header
     GET_INNER_SIZE(pkt_buffer) = pkt_size;
     GET_INNER_LAST_INDICATOR(pkt_buffer) = 1; // I will support pkt_size larger than MAX_PAYLOAD_SIZE in the next phase.
-    memset(GET_INNER_CODE(pkt_buffer), 0x0, (*session)->_MAX_BLOCK_SIZE);
+    memset(GET_INNER_CODE(pkt_buffer), 0x0, (*session)->_max_block_size);
     GET_INNER_CODE(pkt_buffer)[(*session)->_tx_cnt] = 1; // Array index is 0 base.
 
     // Copy data into payload
-    memcpy(GET_INNER_PAYLOAD(pkt_buffer, (*session)->_MAX_BLOCK_SIZE), pkt, pkt_size);
+    memcpy(GET_INNER_PAYLOAD(pkt_buffer, (*session)->_max_block_size), pkt, pkt_size);
 
     // Send data packet
     //PRINT_OUTERHEADER(pkt_buffer);
@@ -236,7 +239,7 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
         while((*session)->_redundancy == 0xff && (*session)->_retransmission_in_progress && clock() < retransmission_timeout)
         {
             current_time = clock();
-            if((current_time - sent_time)/(CLOCKS_PER_SEC/1000) > (*session)->_TIMEOUT)
+            if((current_time - sent_time)/(CLOCKS_PER_SEC/1000) > (*session)->_retransmission_interval)
             {
                 _send_remedy_pkt((*session));
                 sent_time = current_time;
@@ -255,6 +258,47 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
         (*session)->_blk_seq = next_blk_seq;
         (*session)->_largest_pkt_size = 0;
         (*session)->_tx_cnt = 0;
+
+        if(new_param)
+        {
+            if(new_param->block_size != (*session)->_max_block_size)
+            {
+                NetworkCodingPktBuffer* new_buffer = nullptr;
+                unsigned char* new_rand_coef = nullptr;
+
+                try{
+                    new_buffer = new NetworkCodingPktBuffer [new_param->block_size];
+                }
+                catch(std::exception ex)
+                {
+                    // Packet is successfully delivered regardless of the result of updating nc parameters
+                    return pkt_size;
+                }
+
+                try{
+                    new_rand_coef = new unsigned char [new_param->block_size];
+                }
+                catch(std::exception ex)
+                {
+                    delete [] new_buffer;
+                    // Packet is successfully delivered regardless of the result of updating nc parameters
+                    return pkt_size;
+                }
+                delete [] ((*session)->_buffer);
+                delete [] ((*session)->_rand_coef);
+                (*session)->_buffer = new_buffer;
+                (*session)->_rand_coef = new_rand_coef;
+            }
+            if(new_param->retransmission_interval != (*session)->_retransmission_interval)
+            {
+                (*session)->_retransmission_interval = new_param->retransmission_interval;
+            }
+            if(new_param->redundancy != (*session)->_redundancy)
+            {
+                (*session)->_redundancy = new_param->redundancy;
+            }
+            // Parameter is changed.
+        }
     }
     else
     {

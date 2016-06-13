@@ -89,7 +89,7 @@ void ncsocket::close_session(unsigned int ip, unsigned short int port)
     _nc_tx->close_session(ip, port);
 }
 
-int ncsocket::send(unsigned int ip, unsigned short int port, unsigned char* buff, unsigned int size, bool force_start_retransmission, unsigned int ack_timeout)
+int ncsocket::send(unsigned int ip, unsigned short int port, unsigned char* buff, unsigned int size, bool force_start_retransmission, unsigned int ack_timeout, tx_session_param* new_param)
 {
-    return _nc_tx->send(ip, port, buff, size, force_start_retransmission, ack_timeout);
+    return _nc_tx->send(ip, port, buff, size, force_start_retransmission, ack_timeout, new_param);
 }

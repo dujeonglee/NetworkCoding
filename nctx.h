@@ -18,6 +18,13 @@
 #include "finite_field.h"
 #include "networkcodingheader.h"
 
+struct tx_session_param
+{
+    BLOCK_SIZE block_size;
+    unsigned int retransmission_interval;
+    unsigned char redundancy;
+};
+
 // Client session information
 class tx_session_info
 {
@@ -38,15 +45,15 @@ private:
     /**
      * @brief _DATA_ADDR: Client address
      */
-    const sockaddr_in _DATA_ADDR;
+    sockaddr_in _DATA_ADDR;
     /**
      * @brief _MAX_BLOCK_SIZE: Maximum number of packets in a network coding block
      */
-    const BLOCK_SIZE _MAX_BLOCK_SIZE;
+    BLOCK_SIZE _max_block_size;
     /**
      * @brief _TIMEOUT: Rx and Tx timeout value.
      */
-    const unsigned int _TIMEOUT;
+    unsigned int _retransmission_interval;
     std::atomic<bool> _is_connected;
     /**
      * @brief _buffer: Packet buffer
@@ -172,7 +179,7 @@ private:
      * @param complete_block: To force retransmission. (In the last transmission, "complete_block" must be true.)
      * @return: The number of bytes sent.
      */
-    unsigned short int send(unsigned int client_ip, unsigned short int cport, unsigned char* pkt, unsigned short int pkt_size, const bool complete_block, unsigned int ack_timeout);
+    unsigned short int send(unsigned int client_ip, unsigned short int cport, unsigned char* pkt, unsigned short int pkt_size, const bool complete_block, unsigned int ack_timeout, tx_session_param* new_param);
     void _rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* sender_addr, unsigned int sender_addr_len);
 };
 
