@@ -15,9 +15,9 @@
   - Full-duplex reliable data communication. (The packet order is preserved)
   - Full-duplex best-effort communication with constant redundancy for multimedia service. (The packet order is preserved)
   - Connectivity check.
+  - Change network coding session parameters, e.g., block size, redundancy, retransmission interval, and etc, after "open_session"
 
 # Features under developing
-  - Change network coding session parameters, e.g., block size, redundancy, retransmission interval, and etc, after "open_session"
   - Congestion control for retransmission.
   - Extention to multicast transmission.
 
