@@ -132,6 +132,10 @@ bool ncrx::_handle_original_packet(rx_session_info* const session_info, const un
     // For original pkt, GET_OUTER_BLK_SIZE(pkt) is _tx_cnt.
 
     const unsigned short int index = GET_OUTER_BLK_SIZE(pkt);
+    if(session_info->_buffer[index].delivered == true)
+    {
+        return (session_info->_rank == GET_OUTER_BLK_SIZE(pkt)) && (GET_OUTER_FLAGS(session_info->_buffer[index].pkt.buffer) & OuterHeader::FLAGS_END_OF_BLK);
+    }
     session_info->_buffer[index].delivered = false;
     memcpy(session_info->_buffer[index].pkt.buffer, pkt, GET_OUTER_SIZE(pkt));
     session_info->_decoding_matrix[index].empty = false;
@@ -621,7 +625,7 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
 {
     if(buffer[0] == NC_PKT_TYPE::DATA_TYPE)
     {
-        if(rand()%10 == 0)
+        if(rand()%4 == 0)
         {
             // For test, introduce random packet loss of 10%.
             return;
@@ -681,7 +685,6 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
          */
         if(session_info->_blk_seq != blk_seq)
         {
-            //printf("New Block\n");
             for(int i = 0 ; i < session_info->_MAX_BLOCK_SIZE ; i++)
             {
                 if(session_info->_buffer[i].delivered == false && session_info->_decoding_matrix[i].empty == false && (GET_OUTER_FLAGS(session_info->_buffer[i].pkt.buffer) & OuterHeader::FLAGS_ORIGINAL) > 0)

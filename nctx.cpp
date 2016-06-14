@@ -208,7 +208,7 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
     const unsigned char loss_rate = ((*session)->_redundancy.load()==0xff?(invoke_retransmission?(*session)->_loss_rate.load()+1:(unsigned char)0)
                                                          :
                                                          (*session)->_redundancy.load());
-    (*session)->_retransmission_in_progress = (invoke_retransmission?true:false);
+    (*session)->_retransmission_in_progress = invoke_retransmission;
 
     // Fill inner header
     GET_INNER_SIZE(pkt_buffer) = pkt_size;
