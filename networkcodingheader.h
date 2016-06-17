@@ -61,7 +61,7 @@ do\
     printf("INNERHDR [Size = %6hu][Last Indicator = %2hhu][Code =", ((InnerHeader*)(pkt+sizeof(OuterHeader)))->size, ((InnerHeader*)(pkt+sizeof(OuterHeader)))->last_indicator);\
     for(unsigned char _tmp = 0 ; _tmp < max_block_size ; _tmp++)\
     {\
-        printf(" %hhu", (&((InnerHeader*)(pkt+sizeof(OuterHeader)))->codes)[_tmp]);\
+        printf(" %hhu", ((InnerHeader*)(pkt+sizeof(OuterHeader)))->codes[_tmp]);\
     }\
     printf("]\n");\
 }while(0)

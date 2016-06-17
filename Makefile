@@ -25,5 +25,5 @@ debug : $(TARGET)
 
 release : CPPFLAGS := -O0 -c -Wall -std=c++11 -fopenmp
 release : $(TARGET)
-	./$(TARGET)
-	gprof ./$(TARGET) gmon.out
+#	./$(TARGET)
+#	gprof ./$(TARGET) gmon.out

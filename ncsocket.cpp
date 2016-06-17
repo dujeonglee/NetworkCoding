@@ -4,8 +4,8 @@ sockaddr_in addr(unsigned int ip, unsigned short int port)
 {
     sockaddr_in ret = {0};
     ret.sin_family = AF_INET;
-    ret.sin_addr.s_addr = htonl(ip);
-    ret.sin_port = htons(port);
+    ret.sin_addr.s_addr = ip;
+    ret.sin_port = port;
     return ret;
 }
 

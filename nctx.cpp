@@ -17,6 +17,10 @@ tx_session_info::tx_session_info(unsigned int client_ip, unsigned short int cpor
     _state = tx_session_info::STATE::INIT_FAILURE;
     try{
         _buffer = new NetworkCodingPktBuffer [_max_block_size];
+        for(unsigned char i = 0 ; i < _max_block_size ; i++)
+        {
+            memset(_buffer[i].buffer, 0x0, sizeof(NetworkCodingPktBuffer));
+        }
     }catch(std::exception ex){
         _buffer = nullptr;
         return;
@@ -24,6 +28,7 @@ tx_session_info::tx_session_info(unsigned int client_ip, unsigned short int cpor
 
     try{
         _rand_coef = new unsigned char [_max_block_size];
+        memset(_rand_coef, 0x0, _max_block_size);
     }catch(std::exception ex){
         delete [] _buffer;
         return;
@@ -205,24 +210,20 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
     GET_OUTER_MAX_BLK_SIZE(pkt_buffer) = (*session)->_max_block_size;
     GET_OUTER_FLAGS(pkt_buffer) = OuterHeader::FLAGS_ORIGINAL;
     GET_OUTER_FLAGS(pkt_buffer)  = (invoke_retransmission?GET_OUTER_FLAGS(pkt_buffer) | OuterHeader::FLAGS_END_OF_BLK:GET_OUTER_FLAGS(pkt_buffer));
-    const unsigned char loss_rate = ((*session)->_redundancy.load()==0xff?(invoke_retransmission?(*session)->_loss_rate.load()+1:(unsigned char)0)
-                                                         :
-                                                         (*session)->_redundancy.load());
-    (*session)->_retransmission_in_progress = invoke_retransmission;
-
-    // Fill inner header
     GET_INNER_SIZE(pkt_buffer) = pkt_size;
     GET_INNER_LAST_INDICATOR(pkt_buffer) = 1; // I will support pkt_size larger than MAX_PAYLOAD_SIZE in the next phase.
     memset(GET_INNER_CODE(pkt_buffer), 0x0, (*session)->_max_block_size);
     GET_INNER_CODE(pkt_buffer)[(*session)->_tx_cnt] = 1; // Array index is 0 base.
-
-    // Copy data into payload
     memcpy(GET_INNER_PAYLOAD(pkt_buffer, (*session)->_max_block_size), pkt, pkt_size);
 
+    (*session)->_retransmission_in_progress = invoke_retransmission;
+    const unsigned char loss_rate = ((*session)->_redundancy.load()==0xff?(invoke_retransmission?(*session)->_loss_rate.load()+1:(unsigned char)0)
+                                                         :
+                                                         (*session)->_redundancy.load());
+
     // Send data packet
-    //PRINT_OUTERHEADER(pkt_buffer);
-    //PRINT_INNERHEADER(_MAX_BLOCK_SIZE, pkt_buffer);
     sendto(_SOCKET, pkt_buffer, GET_OUTER_SIZE(pkt_buffer), 0, (sockaddr*)&(*session)->_DATA_ADDR, sizeof((*session)->_DATA_ADDR));
+
     if(invoke_retransmission)
     {
         clock_t sent_time = 0;
@@ -236,7 +237,7 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
          * _redundancy: =0xff: Reliable transmission
          *                         <0xff: Best effort transmission.
          */
-        while((*session)->_redundancy == 0xff && (*session)->_retransmission_in_progress && clock() < retransmission_timeout)
+        while((*session)->_retransmission_in_progress && (*session)->_redundancy == 0xff && clock() < retransmission_timeout)
         {
             current_time = clock();
             if((current_time - sent_time)/(CLOCKS_PER_SEC/1000) > (*session)->_retransmission_interval)
@@ -317,7 +318,7 @@ void nctx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
         {
             return;
         }
-        const ip_port_key key = {ntohl(sender_addr->sin_addr.s_addr), ntohs(sender_addr->sin_port)};
+        const ip_port_key key = {sender_addr->sin_addr.s_addr, sender_addr->sin_port};
         tx_session_info** const session = _tx_session_info.find(key);
         if(session != nullptr)
         {
@@ -338,7 +339,7 @@ void nctx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
     }
     else if(buffer[0] == NC_PKT_TYPE::REP_CONNECT_TYPE)
     {
-        const ip_port_key key = {ntohl(sender_addr->sin_addr.s_addr), ntohs(sender_addr->sin_port)};
+        const ip_port_key key = {sender_addr->sin_addr.s_addr, sender_addr->sin_port};
         tx_session_info** const session = _tx_session_info.find(key);
         if(session)
         {

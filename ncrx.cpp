@@ -51,6 +51,11 @@ rx_session_info::rx_session_info(sockaddr_in addr, unsigned char blk_size): _ADD
     try
     {
         _buffer = new PktBuffer[_MAX_BLOCK_SIZE];
+        for(unsigned char i = 0 ; i < _MAX_BLOCK_SIZE ; i++)
+        {
+            _buffer[i].delivered = false;
+            memset(_buffer[i].pkt.buffer, 0x0, sizeof(NetworkCodingPktBuffer));
+        }
     }
     catch(std::exception ex)
     {
@@ -78,7 +83,9 @@ rx_session_info::rx_session_info(sockaddr_in addr, unsigned char blk_size): _ADD
         for(unsigned char index = 0 ; index < _MAX_BLOCK_SIZE ; index++)
         {
             _decoding_matrix[index].encode = new unsigned char[_MAX_BLOCK_SIZE];
+            memset(_decoding_matrix[index].encode, 0x0, _MAX_BLOCK_SIZE);
             _decoding_matrix[index].decode = new unsigned char[_MAX_BLOCK_SIZE];
+            memset(_decoding_matrix[index].decode, 0x0, _MAX_BLOCK_SIZE);
         }
     }
     catch(std::exception ex)
@@ -134,6 +141,11 @@ bool ncrx::_handle_original_packet(rx_session_info* const session_info, const un
     const unsigned short int index = GET_OUTER_BLK_SIZE(pkt);
     if(session_info->_buffer[index].delivered == true)
     {
+        if(index != 0)
+        {
+            std::cout<<"Something is wrong!!!!["<<0+index<<"]\n";
+            exit(-1);
+        }
         return (session_info->_rank == GET_OUTER_BLK_SIZE(pkt)) && (GET_OUTER_FLAGS(session_info->_buffer[index].pkt.buffer) & OuterHeader::FLAGS_END_OF_BLK);
     }
     session_info->_buffer[index].delivered = false;
@@ -141,7 +153,6 @@ bool ncrx::_handle_original_packet(rx_session_info* const session_info, const un
     session_info->_decoding_matrix[index].empty = false;
     memcpy(session_info->_decoding_matrix[index].encode, GET_INNER_CODE(pkt), session_info->_MAX_BLOCK_SIZE);
     memcpy(session_info->_decoding_matrix[index].decode, GET_INNER_CODE(pkt), session_info->_MAX_BLOCK_SIZE);
-
     bool send_ack = false;
     if(session_info->_rank == GET_OUTER_BLK_SIZE(pkt))
     {
@@ -625,7 +636,7 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
 {
     if(buffer[0] == NC_PKT_TYPE::DATA_TYPE)
     {
-        if(rand()%4 == 0)
+        if(rand()%8 == 0)
         {
             // For test, introduce random packet loss of 10%.
             return;
@@ -687,7 +698,9 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
         {
             for(int i = 0 ; i < session_info->_MAX_BLOCK_SIZE ; i++)
             {
-                if(session_info->_buffer[i].delivered == false && session_info->_decoding_matrix[i].empty == false && (GET_OUTER_FLAGS(session_info->_buffer[i].pkt.buffer) & OuterHeader::FLAGS_ORIGINAL) > 0)
+                if(session_info->_buffer[i].delivered == false &&
+                        session_info->_decoding_matrix[i].empty == false &&
+                        (GET_OUTER_FLAGS(session_info->_buffer[i].pkt.buffer) & OuterHeader::FLAGS_ORIGINAL) > 0)
                 {
                     if(_receive_callback != nullptr)
                     {
