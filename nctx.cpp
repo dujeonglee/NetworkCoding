@@ -252,7 +252,6 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
         if((*session)->_redundancy == 0xff && (*session)->_retransmission_in_progress)
         {
             (*session)->_lock.unlock();
-            std::cout<<"Timeout\n";
             return 0;
         }
         unsigned short next_blk_seq = 0;

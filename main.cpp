@@ -5,54 +5,92 @@
 #include <vector>
 #include "ncsocket.h"
 
-void TC0()
+void TC1()
 {
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
     ((unsigned char*)&clientip)[2] = 0;
     ((unsigned char*)&clientip)[3] = 1;
-
-    unsigned char tx_buffer[1024] = {0,};
-
-    FILE* readfile = fopen("./Canon.mp3", "r");
-    FILE* writefile = fopen("./out.mp3", "w");
-    if(readfile == nullptr || writefile == nullptr)
+    bool test_result = true;
     {
-        exit(-1);
-    }
-
-    unsigned int  rx_bytes = 0;
-    ncsocket sender(htons(20000), 500, 500, nullptr);
-    ncsocket receiver(htons(20001), 500, 500, [&](unsigned char* buffer, unsigned int size, sockaddr_in addr)
-    {
-        rx_bytes += size;
-        if(size == 1024)
-            std::cout<<"\r["<<std::setw(10)<<rx_bytes<<" Bytes]"<<"TC0 File transnfer"<<std::flush;
-        else
-            std::cout<<"\r["<<std::setw(10)<<rx_bytes<<" Bytes]"<<"TC0 File transnfer\n"<<std::flush;
-        fwrite (buffer, 1, size, writefile);
-    });
-
-    if(sender.open_session(clientip, htons(20001), BLOCK_SIZE::SIZE8, 0) == false)
-    {
-        exit(-1);
-    }
-    std::thread sending_thread = std::thread([&](){
-        int read = 0;
-        while((read = fread (tx_buffer, 1,1024, readfile)) > 0)
+        ncsocket sender(htons(29996), 500, 500, nullptr);
+        if(sender.open_session(clientip, htons(29997), BLOCK_SIZE::SIZE8, 0) == false)
         {
-            sender.send(clientip, htons(20001), tx_buffer, read, (read!=1024));
+            test_result = false;
         }
-    });
-    sending_thread.join();
-    fclose(readfile);
-    fclose(writefile);
+        if(sender.connect_session(clientip, htons(29997), 3, 1000) == true)
+        {
+            test_result = false;
+        }
+        ncsocket receiver(htons(29997), 500, 500, [&](unsigned char* buffer, unsigned int size, sockaddr_in addr)
+        {
+            return;
+        });
+        if(sender.connect_session(clientip, htons(29997), 3, 1000) == false)
+        {
+            test_result = false;
+        }
+    }
+    {
+        {
+            ncsocket sender(htons(29998), 500, 500, nullptr);
+            const unsigned int TEST_SIZE = 10000;
+            std::atomic<bool> thread_1_done;
+            thread_1_done = false;
+            std::thread sending_thread_1 = std::thread([&](){
+                {
+                    ncsocket receiver(htons(29999), 500, 500, nullptr);
+                    if(sender.open_session(clientip, htons(29999), BLOCK_SIZE::SIZE8, 0) == false)
+                    {
+                        exit(-1);
+                    }
+                    unsigned int bytes_sent = 0;
+                    unsigned char data[1000] = {0};
+                    data[0] = 0;
+                    while(bytes_sent < TEST_SIZE){
+                        data[1] = rand()%256;
+                        data[2] = data[0] ^ data[1];
+                        bytes_sent += sender.send(clientip, htons(29999), data, 1000, false);
+                        data[0]++;
+                    }
+                }
+                {
+                    unsigned int bytes_sent = 0;
+                    unsigned char data[1000] = {0};
+                    data[0] = 0;
+                    while(bytes_sent < TEST_SIZE){
+                        int ret=0;
+                        data[1] = rand()%256;
+                        data[2] = data[0] ^ data[1];
+                        bytes_sent += (ret = sender.send(clientip, htons(29999), data, 1000, false));
+                        if(ret == 0)
+                        {
+                            std::cout<<"Connection is lost\n";
+                            break;
+                        }
+                        data[0]++;
+                    }
+                }
+                thread_1_done = true;
+            });
+            sending_thread_1.detach();
+            while((thread_1_done == false));
+        }
+    }
+    if(test_result == true)
+    {
+        std::cout<<"TC1 Connect test...[OK]\n";
+    }
+    else
+    {
+        std::cout<<"TC1 Connect test...[NG]\n";
+    }
 }
 
-void TC1()
+void TC2()
 {
-    const unsigned int TOTAL_CASES = 10000000;
+    const unsigned int TOTAL_CASES = 10000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -80,11 +118,15 @@ void TC1()
         received++;
         if(received%(TOTAL_CASES/100) == 0)
         {
-            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC1 Random packet size with random retransmission triggering"<<std::flush;
+            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC2 Random packet size with random retransmission triggering"<<std::flush;
         }
     });
 
     if(sender.open_session(clientip, htons(30001), BLOCK_SIZE::SIZE8, 0) == false)
+    {
+        exit(-1);
+    }
+    if(sender.connect_session(clientip, htons(30001), 3, 1000) == false)
     {
         exit(-1);
     }
@@ -105,16 +147,16 @@ void TC1()
     {
         if((tx_random_data[cases] != rx_random_data[cases]) || (tx_random_size[cases] != rx_random_size[cases]))
         {
-            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC1 Random packet size with random retransmission triggering"<<"...[NG]\n";
+            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC2 Random packet size with random retransmission triggering"<<"...[NG]\n";
             exit(-1);
         }
     }
-    std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC1 Random packet size with random retransmission triggering"<<"...[OK]\n";
+    std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC2 Random packet size with random retransmission triggering"<<"...[OK]\n";
 }
 
-void TC2()
+void TC3()
 {
-    const unsigned int TOTAL_CASES = 100000000;
+    const unsigned int TOTAL_CASES = 100000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -140,7 +182,7 @@ void TC2()
         received++;
         if((received%(TOTAL_CASES/100)) == 0)
         {
-            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC2 Full-duplex communication"<<std::flush;
+            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC3 Full-duplex communication"<<std::flush;
         }
     });
 
@@ -155,7 +197,7 @@ void TC2()
         received++;
         if(received%(TOTAL_CASES/100) == 0)
         {
-            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC2 Full-duplex communication"<<std::flush;
+            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC3 Full-duplex communication"<<std::flush;
         }
     });
 
@@ -164,6 +206,14 @@ void TC2()
         exit(-1);
     }
     if(host_2.open_session(clientip, htons(30002), BLOCK_SIZE::SIZE8, 0) == false)
+    {
+        exit(-1);
+    }
+    if(host_1.connect_session(clientip, htons(30003), 3, 1000) == false)
+    {
+        exit(-1);
+    }
+    if(host_2.connect_session(clientip, htons(30002), 3, 1000) == false)
     {
         exit(-1);
     }
@@ -206,18 +256,18 @@ void TC2()
     usleep(1000);
     if(host_1_pkt_order_preserved && host_2_pkt_order_preserved)
     {
-        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC2 Full-duplex communication"<<"...[OK]\n";
+        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC3 Full-duplex communication"<<"...[OK]\n";
     }
     else
     {
-        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC2 Full-duplex communication"<<"...[NG]\n";
+        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC3 Full-duplex communication"<<"...[NG]\n";
         exit(-1);
     }
 }
 
-void TC3()
+void TC4()
 {
-    const unsigned int TOTAL_CASES = 100000000;
+    const unsigned int TOTAL_CASES = 100000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -241,7 +291,7 @@ void TC3()
         received++;
         if(received%(TOTAL_CASES/100) == 0)
         {
-            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC3 Multi-thread"<<std::flush;
+            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC4 Multi-thread"<<std::flush;
         }
         if(buffer[0])
         {
@@ -293,6 +343,10 @@ void TC3()
         }
     });
     if(sender.open_session(clientip, htons(30005), BLOCK_SIZE::SIZE8, 0) == false)
+    {
+        exit(-1);
+    }
+    if(sender.connect_session(clientip, htons(30005), 3, 1000) == false)
     {
         exit(-1);
     }
@@ -376,18 +430,18 @@ void TC3()
     usleep(1000);
     if(thread_1_pkt_order_preserved && thread_2_pkt_order_preserved && thread_3_pkt_order_preserved && thread_4_pkt_order_preserved)
     {
-        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC3 Multi-thread"<<"...[OK]\n";
+        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC4 Multi-thread"<<"...[OK]\n";
     }
     else
     {
-        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC3 Multi-thread"<<"...[NG]\n";
+        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC4 Multi-thread"<<"...[NG]\n";
         exit(-1);
     }
 }
 
-void TC4()
+void TC5()
 {
-    const unsigned int TOTAL_CASES = 100000000;
+    const unsigned int TOTAL_CASES = 100000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -416,7 +470,7 @@ void TC4()
         received++;
         if(received%(TOTAL_CASES/100) == 0)
         {
-            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC4 Multi-senders"<<std::flush;
+            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC5 Multi-senders"<<std::flush;
         }
         if(buffer[0])
         {
@@ -484,6 +538,22 @@ void TC4()
         exit(-1);
     }
     if(sender_4.open_session(clientip, htons(30010), BLOCK_SIZE::SIZE16, 0) == false)
+    {
+        exit(-1);
+    }
+    if(sender_1.connect_session(clientip, htons(30010), 3, 1000) == false)
+    {
+        exit(-1);
+    }
+    if(sender_2.connect_session(clientip, htons(30010), 3, 1000) == false)
+    {
+        exit(-1);
+    }
+    if(sender_3.connect_session(clientip, htons(30010), 3, 1000) == false)
+    {
+        exit(-1);
+    }
+    if(sender_4.connect_session(clientip, htons(30010), 3, 1000) == false)
     {
         exit(-1);
     }
@@ -580,18 +650,18 @@ void TC4()
     usleep(1000);
     if(thread_1_pkt_order_preserved && thread_2_pkt_order_preserved && thread_3_pkt_order_preserved && thread_4_pkt_order_preserved)
     {
-        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC4 Multi-senders"<<"...[OK]\n";
+        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC5 Multi-senders"<<"...[OK]\n";
     }
     else
     {
-        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC4 Multi-senders"<<"...[NG]\n";
+        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC5 Multi-senders"<<"...[NG]\n";
         exit(-1);
     }
 }
 
-void TC5()
+void TC6()
 {
-    const unsigned int TOTAL_CASES = 100000000;
+    const unsigned int TOTAL_CASES = 100000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -615,7 +685,7 @@ void TC5()
         received++;
         if(received%(TOTAL_CASES/100) == 0)
         {
-            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC5 Multi-receivers"<<std::flush;
+            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC6 Multi-receivers"<<std::flush;
         }
         if(buffer[0])
         {
@@ -634,7 +704,7 @@ void TC5()
         received++;
         if(received%(TOTAL_CASES/100) == 0)
         {
-            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC5 Multi-receivers"<<std::flush;
+            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC6 Multi-receivers"<<std::flush;
         }
         if(buffer[0])
         {
@@ -653,7 +723,7 @@ void TC5()
         received++;
         if(received%(TOTAL_CASES/100) == 0)
         {
-            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC5 Multi-receivers"<<std::flush;
+            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC6 Multi-receivers"<<std::flush;
         }
         if(buffer[0])
         {
@@ -672,7 +742,7 @@ void TC5()
         received++;
         if(received%(TOTAL_CASES/100) == 0)
         {
-            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC5 Multi-receivers"<<std::flush;
+            std::cout<<"\r["<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC6 Multi-receivers"<<std::flush;
         }
         if(buffer[0])
         {
@@ -700,6 +770,22 @@ void TC5()
         exit(-1);
     }
     if(sender.open_session(clientip, htons(30015), BLOCK_SIZE::SIZE16, 0) == false)
+    {
+        exit(-1);
+    }
+    if(sender.connect_session(clientip, htons(30012), 3, 1000) == false)
+    {
+        exit(-1);
+    }
+    if(sender.connect_session(clientip, htons(30013), 3, 1000) == false)
+    {
+        exit(-1);
+    }
+    if(sender.connect_session(clientip, htons(30014), 3, 1000) == false)
+    {
+        exit(-1);
+    }
+    if(sender.connect_session(clientip, htons(30015), 3, 1000) == false)
     {
         exit(-1);
     }
@@ -779,18 +865,18 @@ void TC5()
     usleep(1000);
     if(thread_1_pkt_order_preserved && thread_2_pkt_order_preserved && thread_3_pkt_order_preserved && thread_4_pkt_order_preserved)
     {
-        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC5 Multi-receiver"<<"...[OK]\n";
+        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC6 Multi-receiver"<<"...[OK]\n";
     }
     else
     {
-        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC5 Multi-receiver"<<"...[NG]\n";
+        std::cout<<"\r["<<std::flush<<std::setw(3)<<received/(TOTAL_CASES/100)<<"%]"<<"TC6 Multi-receiver"<<"...[NG]\n";
         exit(-1);
     }
 }
 
-void TC6()
+void TC7()
 {
-    const unsigned int TOTAL_CASES = 100000000;
+    const unsigned int TOTAL_CASES = 100000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -805,25 +891,33 @@ void TC6()
     unsigned int received_1 = 0;
     unsigned int received_2 = 0;
 
-    ncsocket host1(30000, 500, 500, [&](unsigned char* buffer, unsigned int size, sockaddr_in addr){
+    ncsocket host1(htons(30016), 500, 500, [&](unsigned char* buffer, unsigned int size, sockaddr_in addr){
         if(buffer[2] != (buffer[0] ^ buffer[1]))
         {
             decoding_error_1 = true;
         }
         received_1++;
     });
-    ncsocket host2(30001, 500, 500, [&](unsigned char* buffer, unsigned int size, sockaddr_in addr){
+    ncsocket host2(htons(30017), 500, 500, [&](unsigned char* buffer, unsigned int size, sockaddr_in addr){
         if(buffer[2] != (buffer[0] ^ buffer[1]))
         {
             decoding_error_2 = true;
         }
         received_2++;
     });
-    if(host1.open_session(clientip, 30001, BLOCK_SIZE::SIZE8, 0, 4) == false)
+    if(host1.open_session(clientip, htons(30017), BLOCK_SIZE::SIZE8, 0, 4) == false)
     {
         exit(-1);
     }
-    if(host2.open_session(clientip, 30000, BLOCK_SIZE::SIZE4, 0, 2) == false)
+    if(host2.open_session(clientip, htons(30016), BLOCK_SIZE::SIZE4, 0, 2) == false)
+    {
+        exit(-1);
+    }
+    if(host1.connect_session(clientip, htons(30017), 3, 1000) == false)
+    {
+        exit(-1);
+    }
+    if(host2.connect_session(clientip, htons(30016), 3, 1000) == false)
     {
         exit(-1);
     }
@@ -842,7 +936,7 @@ void TC6()
             sent++;
             if(sent%(TOTAL_CASES/100) == 0)
             {
-                std::cout<<"\r["<<std::setw(3)<<sent/(TOTAL_CASES/100)<<"%]"<<"TC6 Best-effort"<<std::flush;
+                std::cout<<"\r["<<std::setw(3)<<sent/(TOTAL_CASES/100)<<"%]"<<"TC7 Best-effort"<<std::flush;
             }
             if(data[0]%10 == 0)
             {
@@ -863,7 +957,7 @@ void TC6()
             sent++;
             if(sent%(TOTAL_CASES/100) == 0)
             {
-                std::cout<<"\r["<<std::setw(3)<<sent/(TOTAL_CASES/100)<<"%]"<<"TC6 Best-effort"<<std::flush;
+                std::cout<<"\r["<<std::setw(3)<<sent/(TOTAL_CASES/100)<<"%]"<<"TC7 Best-effort"<<std::flush;
             }
             if(data[0]%10 == 0)
             {
@@ -878,112 +972,73 @@ void TC6()
     usleep(1000);
     if(decoding_error_1 == false && decoding_error_2 == false)
     {
-        std::cout<<"\r["<<std::setw(3)<<sent/(TOTAL_CASES/100)<<"%]"<<"TC6 Best-effort...[OK]";
+        std::cout<<"\r["<<std::setw(3)<<sent/(TOTAL_CASES/100)<<"%]"<<"TC7 Best-effort...[OK]";
     }
     else
     {
-        std::cout<<"\r["<<std::setw(3)<<sent/(TOTAL_CASES/100)<<"%]"<<"TC6 Best-effort...[NG]";
+        std::cout<<"\r["<<std::setw(3)<<sent/(TOTAL_CASES/100)<<"%]"<<"TC7 Best-effort...[NG]";
     }
     std::cout<<"Host1: "<<received_1<<"/50000 / Host2: "<<received_2<<"/50000\n";
 }
 
+void TC8()
+{
+    unsigned int clientip = 0;
+    ((unsigned char*)&clientip)[0] = 127;
+    ((unsigned char*)&clientip)[1] = 0;
+    ((unsigned char*)&clientip)[2] = 0;
+    ((unsigned char*)&clientip)[3] = 1;
+
+    unsigned char tx_buffer[1024] = {0,};
+
+    FILE* readfile = fopen("./Canon.mp3", "r");
+    FILE* writefile = fopen("./out.mp3", "w");
+    if(readfile == nullptr || writefile == nullptr)
+    {
+        exit(-1);
+    }
+
+    unsigned int  rx_bytes = 0;
+    ncsocket sender(htons(20000), 500, 500, nullptr);
+    ncsocket receiver(htons(20001), 500, 500, [&](unsigned char* buffer, unsigned int size, sockaddr_in addr)
+    {
+        rx_bytes += size;
+        if(size == 1024)
+            std::cout<<"\r["<<std::setw(10)<<rx_bytes<<" Bytes]"<<"TC8 File transnfer"<<std::flush;
+        else
+            std::cout<<"\r["<<std::setw(10)<<rx_bytes<<" Bytes]"<<"TC8 File transnfer\n"<<std::flush;
+        fwrite (buffer, 1, size, writefile);
+    });
+
+    if(sender.open_session(clientip, htons(20001), BLOCK_SIZE::SIZE8, 0) == false)
+    {
+        exit(-1);
+    }
+    if(sender.connect_session(clientip, htons(20001), 3, 1000) == false)
+    {
+        exit(-1);
+    }
+    std::thread sending_thread = std::thread([&](){
+        int read = 0;
+        while((read = fread (tx_buffer, 1,1024, readfile)) > 0)
+        {
+            sender.send(clientip, htons(20001), tx_buffer, read, (read!=1024));
+        }
+    });
+    sending_thread.join();
+    fclose(readfile);
+    fclose(writefile);
+}
+
 int main(int argc, char* argv[])
 {
-    TC0();
     TC1();
     TC2();
     TC3();
     TC4();
     TC5();
     TC6();
-#if 0
-    // Test 8 connection test
-    {
-        unsigned int clientip = 0;
-        ((unsigned char*)&clientip)[3] = 127;
-        ((unsigned char*)&clientip)[2] = 0;
-        ((unsigned char*)&clientip)[1] = 0;
-        ((unsigned char*)&clientip)[0] = 1;
-
-        ncsocket sender(30000, 500, 500, nullptr);
-        if(sender.open_session(clientip, 30001, BLOCK_SIZE::SIZE8, 0, 4) == false)
-        {
-            exit(-1);
-        }
-        if(sender.connect_session(clientip, 30001, 3, 500) == true)
-        {
-            std::cout<<"connection established\n";
-            exit(-1);
-        }
-        else
-        {
-            std::cout<<"connection is not established\n";
-        }
-        ncsocket receiver(30001, 500, 500, nullptr);
-        if(sender.connect_session(clientip, 30001, 3, 500) == true)
-        {
-            std::cout<<"connection established\n";
-        }
-        else
-        {
-            std::cout<<"connection is not established\n";
-            exit(-1);
-        }
-        std::cout<<"Test 8 is passed\n";
-    }
-    // Test 9 connection test
-    {
-        unsigned int clientip = 0;
-        ((unsigned char*)&clientip)[3] = 127;
-        ((unsigned char*)&clientip)[2] = 0;
-        ((unsigned char*)&clientip)[1] = 0;
-        ((unsigned char*)&clientip)[0] = 1;
-
-        ncsocket sender(30000, 500, 500, nullptr);
-        if(sender.open_session(clientip, 30001, BLOCK_SIZE::SIZE8, 0) == false)
-        {
-            exit(-1);
-        }
-        const unsigned int TEST_SIZE = 50000000;
-        std::atomic<bool> thread_1_done;
-        thread_1_done = false;
-        std::thread sending_thread_1 = std::thread([&](){
-            {
-                ncsocket receiver(30001, 500, 500, nullptr);
-                unsigned int bytes_sent = 0;
-                unsigned char data[1000] = {0};
-                data[0] = 0;
-                while(bytes_sent < TEST_SIZE){
-                    data[1] = rand()%256;
-                    data[2] = data[0] ^ data[1];
-                    bytes_sent += sender.send(clientip, 30001, data, 1000, false);
-                    data[0]++;
-                }
-            }
-            {
-                unsigned int bytes_sent = 0;
-                unsigned char data[1000] = {0};
-                data[0] = 0;
-                while(bytes_sent < TEST_SIZE){
-                    int ret=0;
-                    data[1] = rand()%256;
-                    data[2] = data[0] ^ data[1];
-                    bytes_sent += (ret = sender.send(clientip, 30001, data, 1000, false));
-                    if(ret == 0)
-                    {
-                        std::cout<<"Connection is lost\n";
-                        break;
-                    }
-                    data[0]++;
-                }
-            }
-            thread_1_done = true;
-        });
-        sending_thread_1.detach();
-        while((thread_1_done == false));
-        sleep(1);
-        std::cout<<"Test 9 is passed\n";
-    }
-#endif
+    TC7();
+    TC8();
     return 0;
 }
