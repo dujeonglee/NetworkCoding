@@ -13,7 +13,6 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
-#include <vector>
 /*========= Project Header =========*/
 #include "avltree.h"
 #include "finite_field.h"

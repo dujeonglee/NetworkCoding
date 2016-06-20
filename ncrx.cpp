@@ -153,7 +153,6 @@ bool ncrx::_handle_original_packet(rx_session_info* const session_info, const un
     session_info->_decoding_matrix[index].empty = false;
     memcpy(session_info->_decoding_matrix[index].encode, GET_INNER_CODE(pkt), session_info->_MAX_BLOCK_SIZE);
     memcpy(session_info->_decoding_matrix[index].decode, GET_INNER_CODE(pkt), session_info->_MAX_BLOCK_SIZE);
-    session_info->_decoding_matrix[index].type = 1;
     bool send_ack = false;
     if(session_info->_rank == GET_OUTER_BLK_SIZE(pkt))
     {
@@ -273,7 +272,6 @@ void ncrx::_decode(rx_session_info * const session_info, unsigned char* pkt, int
     }
     session_info->_buffer[innovative_index].delivered = false;
     memcpy(session_info->_buffer[innovative_index].pkt.buffer, pkt, GET_OUTER_SIZE(pkt));
-    session_info->_decoding_matrix[innovative_index].type = 2;
     session_info->_rank++;
     session_info->_losses++;
 }
@@ -718,7 +716,6 @@ void ncrx::_rx_handler(unsigned char* buffer, unsigned int size, sockaddr_in* se
                 session_info->_buffer[i].delivered = false;
                 memset(session_info->_buffer[i].pkt.buffer, 0x0, TOTAL_HEADER_SIZE(session_info->_MAX_BLOCK_SIZE)+MAX_PAYLOAD_SIZE(session_info->_MAX_BLOCK_SIZE));
                 session_info->_decoding_matrix[i].empty = true;
-                session_info->_decoding_matrix[i].type = 0;
                 memset(session_info->_decoding_matrix[i].encode, 0x0, session_info->_MAX_BLOCK_SIZE);
                 memset(session_info->_decoding_matrix[i].decode, 0x0, session_info->_MAX_BLOCK_SIZE);
             }

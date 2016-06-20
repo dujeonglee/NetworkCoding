@@ -24,7 +24,6 @@ struct DecodingBuffer
     bool empty;
     unsigned char* encode;
     unsigned char* decode;
-    unsigned char type;
 };
 
 /**
