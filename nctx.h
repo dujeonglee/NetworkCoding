@@ -13,6 +13,7 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
+#include <vector>
 /*========= Project Header =========*/
 #include "avltree.h"
 #include "finite_field.h"
@@ -81,7 +82,7 @@ private:
      * @brief _blk_seq: Random sequence number for each block.
      * It must be different from the previous network coding block sequence.
      */
-    unsigned short int _blk_seq;
+    std::atomic<unsigned short int> _blk_seq;
     /**
      * @brief _loss_rate: The number of remedy packets in the previous block.
      * The nc server will send this many remedy packets before waiting for an ack from the client.

@@ -48,6 +48,7 @@ tx_session_info::~tx_session_info()
     {
         return;
     }
+    _retransmission_in_progress = false;
     delete [] _buffer;
     delete [] _rand_coef;
 }
@@ -181,12 +182,14 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
     (*session)->_lock.lock();
     if((*session)->_state == tx_session_info::STATE::INIT_FAILURE)
     {
+        (*session)->_lock.unlock();
         return 0;
     }
     if(pkt_size > MAX_PAYLOAD_SIZE((*session)->_max_block_size))
     {
         // A single packet size is limitted to MAX_PAYLOAD_SIZE for the simplicity.
         // Support of large data packet is my future work.
+        (*session)->_lock.unlock();
         return 0;
     }
     if((*session)->_largest_pkt_size < pkt_size)
@@ -249,6 +252,7 @@ unsigned short int nctx::send(unsigned int client_ip, unsigned short int cport, 
         if((*session)->_redundancy == 0xff && (*session)->_retransmission_in_progress)
         {
             (*session)->_lock.unlock();
+            std::cout<<"Timeout\n";
             return 0;
         }
         unsigned short next_blk_seq = 0;

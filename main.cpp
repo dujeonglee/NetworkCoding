@@ -22,10 +22,15 @@ void TC0()
         exit(-1);
     }
 
-
+    unsigned int  rx_bytes = 0;
     ncsocket sender(htons(20000), 500, 500, nullptr);
     ncsocket receiver(htons(20001), 500, 500, [&](unsigned char* buffer, unsigned int size, sockaddr_in addr)
     {
+        rx_bytes += size;
+        if(size == 1024)
+            std::cout<<"\r["<<std::setw(10)<<rx_bytes<<" Bytes]"<<"TC0 File transnfer"<<std::flush;
+        else
+            std::cout<<"\r["<<std::setw(10)<<rx_bytes<<" Bytes]"<<"TC0 File transnfer\n"<<std::flush;
         fwrite (buffer, 1, size, writefile);
     });
 
@@ -41,14 +46,13 @@ void TC0()
         }
     });
     sending_thread.join();
-    sleep(1);
     fclose(readfile);
     fclose(writefile);
 }
 
 void TC1()
 {
-    const unsigned int TOTAL_CASES = 100000;
+    const unsigned int TOTAL_CASES = 10000000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -110,7 +114,7 @@ void TC1()
 
 void TC2()
 {
-    const unsigned int TOTAL_CASES = 100000;
+    const unsigned int TOTAL_CASES = 100000000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -130,6 +134,8 @@ void TC2()
         if(buffer[0] != host_1_expect++)
         {
             host_1_pkt_order_preserved = false;
+            printf("Host 1 out of order\n");
+            //exit(-1);
         }
         received++;
         if((received%(TOTAL_CASES/100)) == 0)
@@ -143,6 +149,8 @@ void TC2()
         if(buffer[0] != host_2_expect++)
         {
             host_2_pkt_order_preserved = false;
+            printf("Host 2 out of order\n");
+            //exit(-1);
         }
         received++;
         if(received%(TOTAL_CASES/100) == 0)
@@ -209,7 +217,7 @@ void TC2()
 
 void TC3()
 {
-    const unsigned int TOTAL_CASES = 100000;
+    const unsigned int TOTAL_CASES = 100000000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -379,7 +387,7 @@ void TC3()
 
 void TC4()
 {
-    const unsigned int TOTAL_CASES = 100000;
+    const unsigned int TOTAL_CASES = 100000000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -583,7 +591,7 @@ void TC4()
 
 void TC5()
 {
-    const unsigned int TOTAL_CASES = 100000;
+    const unsigned int TOTAL_CASES = 100000000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -782,7 +790,7 @@ void TC5()
 
 void TC6()
 {
-    const unsigned int TOTAL_CASES = 100000;
+    const unsigned int TOTAL_CASES = 100000000;
     unsigned int clientip = 0;
     ((unsigned char*)&clientip)[0] = 127;
     ((unsigned char*)&clientip)[1] = 0;
@@ -889,9 +897,6 @@ int main(int argc, char* argv[])
     TC5();
     TC6();
 #if 0
-    // Test7: Redundancy Test
-    {
-    }
     // Test 8 connection test
     {
         unsigned int clientip = 0;
