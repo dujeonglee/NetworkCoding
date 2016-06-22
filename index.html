@@ -1,0 +1,150 @@
+<!doctype html>
+<!-- The Time Machine GitHub pages theme was designed and developed by Jon Rohan, on Feb 7, 2012. -->
+<!-- Follow him for fun. http://twitter.com/jonrohan. Tail his code on https://github.com/jonrohan -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+  <link rel="stylesheet" href="stylesheets/stylesheet.css" media="screen">
+  <link rel="stylesheet" href="stylesheets/github-dark.css">
+  <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+  <script type="text/javascript" src="javascripts/script.js"></script>
+
+  <title>Networkcoding</title>
+  <meta name="description" content="Implementation of network coding data transportation">
+
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+</head>
+
+<body>
+
+  <div class="wrapper">
+    <header>
+      <h1 class="title">Networkcoding</h1>
+    </header>
+    <div id="container">
+      <p class="tagline">Implementation of network coding data transportation</p>
+      <div id="main" role="main">
+        <div class="download-bar">
+        <div class="inner">
+          <a href="https://github.com/dujeonglee/NetworkCoding/tarball/master" class="download-button tar"><span>Download</span></a>
+          <a href="https://github.com/dujeonglee/NetworkCoding/zipball/master" class="download-button zip"><span>Download</span></a>
+          <a href="https://github.com/dujeonglee/NetworkCoding" class="code">View Networkcoding on GitHub</a>
+        </div>
+        <span class="blc"></span><span class="trc"></span>
+        </div>
+        <article class="markdown-body">
+          <h1>
+<a id="networkcoding" class="anchor" href="#networkcoding" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>NetworkCoding</h1>
+
+<ul>
+<li>Implementation of network coding data transportation.</li>
+<li>Example code can be found in main.cpp.</li>
+</ul>
+
+<h1>
+<a id="why-network-coding-transport" class="anchor" href="#why-network-coding-transport" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Why network coding transport</h1>
+
+<ul>
+<li>Provide reliable packet transport </li>
+<li>Guarantee packet order</li>
+<li>Data is not stream but block, like UDP.</li>
+</ul>
+
+<h1>
+<a id="contributions" class="anchor" href="#contributions" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Contributions</h1>
+
+<ul>
+<li>I welcome any contributions from you.</li>
+</ul>
+
+<h1>
+<a id="features-supported" class="anchor" href="#features-supported" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Features supported</h1>
+
+<ul>
+<li>Thread-safe</li>
+<li>Full-duplex reliable data communication. (The packet order is preserved)</li>
+<li>Full-duplex best-effort communication with constant redundancy for multimedia service. (The packet order is preserved)</li>
+<li>Connectivity check.</li>
+<li>Change network coding session parameters, e.g., block size, redundancy, retransmission interval, and etc, after "open_session"</li>
+</ul>
+
+<h1>
+<a id="features-under-developing" class="anchor" href="#features-under-developing" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Features under developing</h1>
+
+<ul>
+<li>Congestion control for retransmission.</li>
+<li>Extention to multicast transmission.</li>
+</ul>
+
+<h1>
+<a id="example" class="anchor" href="#example" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Example</h1>
+
+<div class="highlight highlight-source-c++"><pre>#<span class="pl-k">include</span> <span class="pl-s"><span class="pl-pds">"</span>ncsocket.h<span class="pl-pds">"</span></span>
+
+<span class="pl-k">void</span> <span class="pl-en">rx_callback</span>(<span class="pl-k">unsigned</span> <span class="pl-k">char</span>* buff, <span class="pl-k">unsigned</span> <span class="pl-k">int</span> size, sockaddr_in sender){
+  <span class="pl-c">/*Do something with the data*/</span>
+}
+
+<span class="pl-c">// Reliable transmission</span>
+{
+  ncsocket <span class="pl-smi">nc_socket</span>(port, tx_timeout, rx_timeout, rx_callback);
+  nc_socket.<span class="pl-c1">open_session</span>(client_ip, client_port, BLOCK_SIZE::SIZE8, retransmission_interval);
+  nc_socket.<span class="pl-c1">send</span>(client_ip, client_port, buffer, buffer_size, <span class="pl-c1">false</span>);
+  <span class="pl-c">/*</span>
+<span class="pl-c">   * Retransmission is triggered every BLOCK_SIZE of packets are transmitted. </span>
+<span class="pl-c">   * If you want to immediately trigger retransmission pass "true" for the last argument as shown in below.</span>
+<span class="pl-c">   */</span>
+  nc_socket.<span class="pl-c1">send</span>(client_ip, client_port, buffer, buffer_size, <span class="pl-c1">true</span>);
+}
+
+<span class="pl-c">// Best-effort transmission with constant redundancy</span>
+{
+  ncsocket <span class="pl-smi">nc_socket</span>(port, tx_timeout, rx_timeout, rx_callback);
+  nc_socket.<span class="pl-c1">open_session</span>(client_ip, client_port, BLOCK_SIZE::SIZE8, retransmission_interval, <span class="pl-c1">4</span> <span class="pl-c">/*Number of redundant packets*/</span>);
+  nc_socket.<span class="pl-c1">send</span>(client_ip, client_port, buffer, buffer_size, <span class="pl-c1">false</span>);
+  <span class="pl-c">/*</span>
+<span class="pl-c">   * 4 redundant packets are transmitted after all BLOCK_SIZE of packets are sent. </span>
+<span class="pl-c">   * If you want to immediately send redundant packets pass "true" for the last argument as shown in below.</span>
+<span class="pl-c">   */</span>
+  nc_socket.<span class="pl-c1">send</span>(client_ip, client_port, buffer, buffer_size, <span class="pl-c1">true</span>);
+}
+
+<span class="pl-c">// Make sure if remote host is ready to receive packet</span>
+{
+  ncsocket <span class="pl-smi">nc_socket</span>(port, tx_timeout, rx_timeout, rx_callback);
+  nc_socket.<span class="pl-c1">open_session</span>(client_ip, client_port, BLOCK_SIZE::SIZE8, retransmission_interval, <span class="pl-c1">4</span> <span class="pl-c">/*Number of redundant packets*/</span>);
+  <span class="pl-k">if</span>(nc_socket.<span class="pl-c1">connect_session</span>(client_ip, client_port, <span class="pl-c1">3</span>, <span class="pl-c1">500</span>) == <span class="pl-c1">true</span>)
+  {
+    <span class="pl-c">// Remote host is ready.</span>
+  }
+  <span class="pl-k">else</span>
+  {
+    <span class="pl-c">// The host is not ready.</span>
+  }
+}</pre></div>
+        </article>
+      </div>
+    </div>
+    <footer>
+      <div class="owner">
+      <p><a href="https://github.com/dujeonglee" class="avatar"><img src="https://avatars2.githubusercontent.com/u/15942152?v=3&amp;s=60" width="48" height="48"></a> <a href="https://github.com/dujeonglee">dujeonglee</a> maintains <a href="https://github.com/dujeonglee/NetworkCoding">Networkcoding</a></p>
+
+
+      </div>
+      <div class="creds">
+        <small>This page generated using <a href="https://pages.github.com/">GitHub Pages</a><br>theme by <a href="https://twitter.com/jonrohan/">Jon Rohan</a></small>
+      </div>
+    </footer>
+  </div>
+  <div class="current-section">
+    <a href="#top">Scroll to top</a>
+    <a href="https://github.com/dujeonglee/NetworkCoding/tarball/master" class="tar">tar</a><a href="https://github.com/dujeonglee/NetworkCoding/zipball/master" class="zip">zip</a><a href="" class="code">source code</a>
+    <p class="name"></p>
+  </div>
+
+  
+</body>
+</html>
