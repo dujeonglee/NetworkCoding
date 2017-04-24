@@ -1,3 +1,5 @@
+# This repo is deprecated by NetworkCodingRev.
+  - https://github.com/dujeonglee/NetworkCodingRev
 # NetworkCoding
   - Implementation of network coding data transportation.
   - Example code can be found in main.cpp.
